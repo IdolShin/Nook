@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nook Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:   #1D9E75;
+      --green-d: #157a5a;
+      --green-l: #e8f7f2;
+      --red:     #e53e3e;
+      --gray-1:  #f7f8fa;
+      --gray-2:  #edf0f4;
+      --gray-3:  #c8d0db;
+      --gray-5:  #6b7a8d;
+      --gray-8:  #1e2a38;
+      --radius:  10px;
+      --shadow:  0 2px 12px rgba(0,0,0,.08);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--gray-1);
+      color: var(--gray-8);
+      min-height: 100vh;
+    }
+
+    /* ── Login ── */
+    #login-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .login-card {
+      background: #fff;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 40px 36px;
+      width: 360px;
+    }
+    .login-card .logo {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--green);
+      margin-bottom: 6px;
+    }
+    .login-card .subtitle {
+      color: var(--gray-5);
+      font-size: 14px;
+      margin-bottom: 28px;
+    }
+    .field { margin-bottom: 16px; }
+    .field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gray-5);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 6px;
+    }
+    .field input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid var(--gray-3);
+      border-radius: 8px;
+      font-size: 15px;
+      transition: border-color .15s;
+      outline: none;
+    }
+    .field input:focus { border-color: var(--green); }
+    .field input.error { border-color: var(--red); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 11px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, opacity .15s;
+    }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-primary { background: var(--green); color: #fff; width: 100%; }
+    .btn-primary:hover:not(:disabled) { background: var(--green-d); }
+    .btn-outline {
+      background: transparent;
+      color: var(--green);
+      border: 1.5px solid var(--green);
+    }
+    .btn-outline:hover:not(:disabled) { background: var(--green-l); }
+
+    #login-error {
+      color: var(--red);
+      font-size: 13px;
+      margin-bottom: 12px;
+      display: none;
+    }
+
+    /* ── App shell ── */
+    #app { display: none; min-height: 100vh; }
+
+    header {
+      background: #fff;
+      border-bottom: 1px solid var(--gray-2);
+      padding: 0 28px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header-logo { font-size: 20px; font-weight: 800; color: var(--green); }
+    .header-biz  { font-size: 13px; color: var(--gray-5); }
+    #logout-btn  { font-size: 13px; color: var(--gray-5); background: none; border: none; cursor: pointer; }
+    #logout-btn:hover { color: var(--red); }
+
+    main { max-width: 760px; margin: 36px auto; padding: 0 20px 60px; }
+
+    .page-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .page-sub   { font-size: 14px; color: var(--gray-5); margin-bottom: 28px; }
+
+    /* ── Card ── */
+    .card {
+      background: #fff;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+    .card-title { font-size: 16px; font-weight: 700; margin-bottom: 20px; }
+
+    /* ── Mode tabs ── */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .tab {
+      padding: 8px 18px;
+      border-radius: 20px;
+      border: 1.5px solid var(--gray-3);
+      background: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gray-5);
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .tab.active {
+      border-color: var(--green);
+      background: var(--green-l);
+      color: var(--green);
+    }
+
+    /* ── Customer list ── */
+    #customer-panel {
+      display: none;
+      margin-bottom: 20px;
+    }
+    .customer-search {
+      width: 100%;
+      padding: 9px 14px;
+      border: 1.5px solid var(--gray-3);
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      margin-bottom: 10px;
+    }
+    .customer-search:focus { border-color: var(--green); }
+
+    .customer-list-box {
+      border: 1.5px solid var(--gray-2);
+      border-radius: 8px;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+    .customer-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--gray-2);
+      cursor: pointer;
+      transition: background .1s;
+    }
+    .customer-item:last-child { border-bottom: none; }
+    .customer-item:hover { background: var(--gray-1); }
+    .customer-item input[type=checkbox] { accent-color: var(--green); width: 16px; height: 16px; }
+    .customer-name { font-size: 14px; font-weight: 600; flex: 1; }
+    .customer-meta { font-size: 12px; color: var(--gray-5); }
+    .customer-wallet {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: var(--green-l);
+      color: var(--green);
+    }
+    .customer-wallet.none { background: var(--gray-2); color: var(--gray-5); }
+
+    .select-controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .select-controls button {
+      font-size: 12px;
+      color: var(--green);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      padding: 0;
+    }
+    .select-controls button:hover { text-decoration: underline; }
+    .selected-count {
+      font-size: 12px;
+      color: var(--gray-5);
+      margin-left: auto;
+    }
+
+    #no-customers {
+      padding: 24px;
+      text-align: center;
+      color: var(--gray-5);
+      font-size: 14px;
+    }
+
+    /* ── Message ── */
+    .msg-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gray-5);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 8px;
+    }
+    #char-count { font-weight: 400; }
+    #char-count.warn { color: #e08a00; }
+    #char-count.over { color: var(--red); }
+
+    textarea#message {
+      width: 100%;
+      min-height: 100px;
+      padding: 12px 14px;
+      border: 1.5px solid var(--gray-3);
+      border-radius: 8px;
+      font-size: 15px;
+      font-family: inherit;
+      resize: vertical;
+      outline: none;
+      transition: border-color .15s;
+    }
+    textarea#message:focus { border-color: var(--green); }
+    textarea#message.error { border-color: var(--red); }
+
+    .send-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 18px;
+      gap: 14px;
+    }
+    .send-info { font-size: 13px; color: var(--gray-5); }
+    #send-btn { min-width: 140px; }
+
+    /* ── Results ── */
+    #result-box {
+      display: none;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-top: 18px;
+      font-size: 14px;
+    }
+    #result-box.success { background: var(--green-l); color: var(--green-d); border: 1px solid #b3dfd1; }
+    #result-box.error   { background: #fff5f5; color: var(--red); border: 1px solid #fca5a5; }
+    .result-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .result-row:last-child { margin-bottom: 0; }
+    .result-label { font-weight: 600; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--gray-8);
+      color: #fff;
+      padding: 12px 22px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .25s, transform .25s;
+      white-space: nowrap;
+      z-index: 999;
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    #toast.success { background: var(--green); }
+    #toast.error   { background: var(--red); }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Loading skeleton ── */
+    .skeleton {
+      background: linear-gradient(90deg, var(--gray-2) 25%, var(--gray-1) 50%, var(--gray-2) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.2s infinite;
+      border-radius: 6px;
+      height: 40px;
+      margin-bottom: 8px;
+    }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+  </style>
+</head>
+<body>
+
+<!-- ── Login ───────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="logo">Nook</div>
+    <div class="subtitle">Business Dashboard</div>
+
+    <div id="login-error"></div>
+
+    <form id="login-form">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="login-email" autocomplete="email" required placeholder="you@example.com" />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="login-password" autocomplete="current-password" required placeholder="••••••••" />
+      </div>
+      <button class="btn btn-primary" id="login-btn" type="submit">Sign in</button>
+    </form>
+  </div>
+</div>
+
+<!-- ── App ──────────────────────────────────────────────── -->
+<div id="app">
+  <header>
+    <span class="header-logo">Nook</span>
+    <span class="header-biz" id="header-biz"></span>
+    <button id="logout-btn">Sign out</button>
+  </header>
+
+  <main>
+    <div class="page-title">Broadcast Notification</div>
+    <div class="page-sub">Send a push notification and update Google Wallet cards for your customers.</div>
+
+    <div class="card">
+      <div class="card-title">Target Audience</div>
+
+      <div class="tabs">
+        <button class="tab active" data-mode="all">All Customers</button>
+        <button class="tab" data-mode="customers">By Customer</button>
+      </div>
+
+      <!-- Customer selector -->
+      <div id="customer-panel">
+        <div class="select-controls">
+          <button id="select-all-btn">Select all</button>
+          <button id="deselect-all-btn">Deselect all</button>
+          <span class="selected-count" id="selected-count">0 selected</span>
+        </div>
+        <input class="customer-search" id="customer-search" type="text" placeholder="Search by name or phone…" />
+        <div class="customer-list-box" id="customer-list">
+          <div class="skeleton"></div>
+          <div class="skeleton"></div>
+          <div class="skeleton"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Message</div>
+
+      <div class="msg-label">
+        <span>Message</span>
+        <span id="char-count">0 / 140</span>
+      </div>
+      <textarea id="message" maxlength="140" placeholder="e.g. Double stamps today — come visit us!"></textarea>
+
+      <div class="send-row">
+        <span class="send-info" id="send-info">Sends to all customers</span>
+        <button class="btn btn-primary" id="send-btn">
+          <span id="send-label">Send</span>
+        </button>
+      </div>
+
+      <div id="result-box"></div>
+    </div>
+  </main>
+</div>
+
+<!-- ── Toast ─────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<script>
+  const API = 'http://localhost:3001'
+
+  // ── State ──────────────────────────────────────────────
+  let token     = localStorage.getItem('nook_token')
+  let business  = JSON.parse(localStorage.getItem('nook_biz') || 'null')
+  let customers = []        // all fetched customers
+  let selected  = new Set() // selected customer IDs
+  let mode      = 'all'     // 'all' | 'customers'
+  let searchQ   = ''
+
+  // ── Init ───────────────────────────────────────────────
+  if (token && business) showApp()
+
+  // ── Login ──────────────────────────────────────────────
+  document.getElementById('login-form').addEventListener('submit', async e => {
+    e.preventDefault()
+    const btn = document.getElementById('login-btn')
+    const err = document.getElementById('login-error')
+    const email    = document.getElementById('login-email').value.trim()
+    const password = document.getElementById('login-password').value
+
+    btn.disabled = true
+    btn.innerHTML = '<div class="spinner"></div>'
+    err.style.display = 'none'
+
+    try {
+      const res  = await fetch(`${API}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Login failed')
+
+      token    = data.token
+      business = data.business
+      localStorage.setItem('nook_token', token)
+      localStorage.setItem('nook_biz', JSON.stringify(business))
+      showApp()
+    } catch (ex) {
+      err.textContent = ex.message
+      err.style.display = 'block'
+    } finally {
+      btn.disabled = false
+      btn.textContent = 'Sign in'
+    }
+  })
+
+  // ── Show App ───────────────────────────────────────────
+  function showApp() {
+    document.getElementById('login-screen').style.display = 'none'
+    document.getElementById('app').style.display = 'block'
+    document.getElementById('header-biz').textContent = business?.name || ''
+    loadCustomers()
+  }
+
+  // ── Logout ─────────────────────────────────────────────
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    localStorage.removeItem('nook_token')
+    localStorage.removeItem('nook_biz')
+    location.reload()
+  })
+
+  // ── Load customers ─────────────────────────────────────
+  async function loadCustomers() {
+    try {
+      const res  = await authFetch('/api/customers')
+      const data = await res.json()
+      customers  = data.customers || []
+      renderList()
+    } catch {
+      document.getElementById('customer-list').innerHTML =
+        '<div id="no-customers">Failed to load customers.</div>'
+    }
+  }
+
+  // ── Render customer list ───────────────────────────────
+  function renderList() {
+    const box       = document.getElementById('customer-list')
+    const filtered  = customers.filter(c =>
+      !searchQ ||
+      c.name?.toLowerCase().includes(searchQ) ||
+      c.phone?.includes(searchQ)
+    )
+
+    if (!filtered.length) {
+      box.innerHTML = '<div id="no-customers">No customers found.</div>'
+      updateSelCount()
+      return
+    }
+
+    box.innerHTML = filtered.map(c => {
+      const checked = selected.has(c.id) ? 'checked' : ''
+      const wallet  = c.wallet_type === 'google'
+        ? '<span class="customer-wallet">Google Wallet</span>'
+        : '<span class="customer-wallet none">No wallet</span>'
+      return `
+        <label class="customer-item" data-id="${c.id}">
+          <input type="checkbox" value="${c.id}" ${checked} />
+          <div style="flex:1">
+            <div class="customer-name">${esc(c.name)}</div>
+            <div class="customer-meta">${esc(c.phone || '—')}</div>
+          </div>
+          ${wallet}
+        </label>`
+    }).join('')
+
+    box.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', e => {
+        e.stopPropagation()
+        const id = cb.closest('.customer-item').dataset.id
+        selected.has(id) ? selected.delete(id) : selected.add(id)
+        updateSelCount()
+        updateSendInfo()
+      })
+    })
+
+    box.querySelectorAll('.customer-item').forEach(item => {
+      item.addEventListener('click', e => {
+        if (e.target.tagName === 'INPUT') return
+        const cb = item.querySelector('input')
+        cb.checked = !cb.checked
+        cb.dispatchEvent(new Event('change'))
+      })
+    })
+
+    updateSelCount()
+  }
+
+  function updateSelCount() {
+    document.getElementById('selected-count').textContent =
+      `${selected.size} selected`
+  }
+
+  // ── Search ─────────────────────────────────────────────
+  document.getElementById('customer-search').addEventListener('input', e => {
+    searchQ = e.target.value.toLowerCase().trim()
+    renderList()
+  })
+
+  // ── Select / Deselect all ──────────────────────────────
+  document.getElementById('select-all-btn').addEventListener('click', () => {
+    customers
+      .filter(c => !searchQ || c.name?.toLowerCase().includes(searchQ) || c.phone?.includes(searchQ))
+      .forEach(c => selected.add(c.id))
+    renderList()
+    updateSendInfo()
+  })
+  document.getElementById('deselect-all-btn').addEventListener('click', () => {
+    selected.clear()
+    renderList()
+    updateSendInfo()
+  })
+
+  // ── Mode tabs ──────────────────────────────────────────
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+      tab.classList.add('active')
+      mode = tab.dataset.mode
+      document.getElementById('customer-panel').style.display =
+        mode === 'customers' ? 'block' : 'none'
+      selected.clear()
+      renderList()
+      updateSendInfo()
+    })
+  })
+
+  // ── Char counter ───────────────────────────────────────
+  document.getElementById('message').addEventListener('input', e => {
+    const len = e.target.value.length
+    const el  = document.getElementById('char-count')
+    el.textContent = `${len} / 140`
+    el.className = len > 120 ? (len === 140 ? 'over' : 'warn') : ''
+  })
+
+  // ── Send info label ────────────────────────────────────
+  function updateSendInfo() {
+    const el = document.getElementById('send-info')
+    if (mode === 'all') {
+      el.textContent = `Sends to all ${customers.length} customer${customers.length !== 1 ? 's' : ''}`
+    } else {
+      el.textContent = selected.size
+        ? `Sends to ${selected.size} selected customer${selected.size !== 1 ? 's' : ''}`
+        : 'Select customers above'
+    }
+  }
+
+  // ── Send ───────────────────────────────────────────────
+  document.getElementById('send-btn').addEventListener('click', async () => {
+    const msgEl = document.getElementById('message')
+    const msg   = msgEl.value.trim()
+
+    // Validate
+    msgEl.classList.remove('error')
+    if (!msg) {
+      msgEl.classList.add('error')
+      msgEl.focus()
+      showToast('Please enter a message.', 'error')
+      return
+    }
+    if (mode === 'customers' && selected.size === 0) {
+      showToast('Please select at least one customer.', 'error')
+      return
+    }
+
+    const btn   = document.getElementById('send-btn')
+    const label = document.getElementById('send-label')
+    btn.disabled = true
+    label.innerHTML = '<div class="spinner"></div>'
+
+    const body = { message: msg }
+    if (mode === 'customers') body.customer_ids = [...selected]
+
+    try {
+      const res  = await authFetch('/api/push/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      const data = await res.json()
+
+      if (!res.ok) throw new Error(data.error || 'Broadcast failed')
+
+      showResult(data, true)
+      showToast(`Sent! ${data.wallet_updated} wallet${data.wallet_updated !== 1 ? 's' : ''} updated.`, 'success')
+      msgEl.value = ''
+      document.getElementById('char-count').textContent = '0 / 140'
+      document.getElementById('char-count').className = ''
+    } catch (ex) {
+      showResult({ error: ex.message }, false)
+      showToast(ex.message || 'Broadcast failed.', 'error')
+    } finally {
+      btn.disabled = false
+      label.textContent = 'Send'
+    }
+  })
+
+  // ── Result box ─────────────────────────────────────────
+  function showResult(data, ok) {
+    const box = document.getElementById('result-box')
+    box.className = ok ? 'success' : 'error'
+    box.style.display = 'block'
+
+    if (!ok) {
+      box.textContent = data.error || 'An error occurred.'
+      return
+    }
+
+    box.innerHTML = `
+      <div class="result-row">
+        <span class="result-label">Total customers</span>
+        <span>${data.total_customers ?? '—'}</span>
+      </div>
+      <div class="result-row">
+        <span class="result-label">Web push sent</span>
+        <span>${data.web_push_sent ?? 0}</span>
+      </div>
+      <div class="result-row">
+        <span class="result-label">Google Wallet updated</span>
+        <span>${data.wallet_updated ?? 0}</span>
+      </div>
+      ${data.failed ? `<div class="result-row"><span class="result-label">Failed</span><span>${data.failed}</span></div>` : ''}
+    `
+  }
+
+  // ── Toast ──────────────────────────────────────────────
+  let toastTimer
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast')
+    clearTimeout(toastTimer)
+    t.textContent = msg
+    t.className = `show ${type}`
+    toastTimer = setTimeout(() => { t.className = '' }, 3200)
+  }
+
+  // ── Auth fetch helper ──────────────────────────────────
+  function authFetch(path, opts = {}) {
+    return fetch(`${API}${path}`, {
+      ...opts,
+      headers: { ...opts.headers, Authorization: `Bearer ${token}` }
+    })
+  }
+
+  // ── Escape HTML ────────────────────────────────────────
+  function esc(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+  }
+</script>
+</body>
+</html>

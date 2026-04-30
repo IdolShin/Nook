@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(unzip files.zip -d .)",
+      "Bash(mv index.js src/index.js)",
+      "Bash(mv auth.js src/routes/auth.js)",
+      "Bash(mv cards.js src/routes/cards.js)",
+      "Bash(mv customers.js src/routes/customers.js)",
+      "Bash(mv scan.js src/routes/scan.js)",
+      "Bash(npm install *)",
+      "Bash(timeout 5 node src/index.js)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(node -e \"require\\('dotenv'\\).config\\(\\); console.log\\('VAPID_PUBLIC_KEY:', process.env.VAPID_PUBLIC_KEY ? process.env.VAPID_PUBLIC_KEY.substring\\(0,20\\)+'...' : 'NOT SET'\\)\")",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:3001/health)",
+      "Bash(curl -s -X POST http://localhost:3001/api/auth/register -H 'Content-Type: application/json' -d '{\"name\":\"Nook Test Cafe\",\"email\":\"test_wallet@nook.com\",\"password\":\"test1234\"}')",
+      "Bash(python -m json.tool)",
+      "Bash(curl *)",
+      "Bash(node -e ' *)",
+      "PowerShell(Get-Process *)",
+      "Bash(python3 -m json.tool)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('type:', d.get\\('type'\\)\\); print\\('client_email:', d.get\\('client_email'\\)\\); print\\('project_id:', d.get\\('project_id'\\)\\)\")",
+      "Bash(node *)",
+      "Read(//c/Users/woosa/**)",
+      "Read(//c/Users/woosa/Documents/**)"
+    ]
+  }
+}
