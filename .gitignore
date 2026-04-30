@@ -1,0 +1,17 @@
+# Environment variables
+.env
+.env.*
+
+# Service account credentials & certs
+certs/
+
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
