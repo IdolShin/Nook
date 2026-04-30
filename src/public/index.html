@@ -423,7 +423,7 @@
 <div id="toast"></div>
 
 <script>
-  const API = 'http://localhost:3001'
+  const API = window.location.hostname === 'localhost' ? 'http://localhost:3001' : window.location.origin
 
   // ── State ──────────────────────────────────────────────
   let token     = localStorage.getItem('nook_token')
