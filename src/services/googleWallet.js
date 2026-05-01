@@ -7,6 +7,9 @@ const ISSUER_ID = process.env.GOOGLE_WALLET_ISSUER_ID
 const SCOPES = ['https://www.googleapis.com/auth/wallet_object.issuer']
 
 function loadCredentials() {
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_BASE64) {
+    return JSON.parse(Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8'))
+  }
   const credPath = path.resolve(process.env.GOOGLE_APPLICATION_CREDENTIALS)
   return JSON.parse(fs.readFileSync(credPath, 'utf8'))
 }
@@ -200,4 +203,132 @@ async function updateWithMessage(customerId, messageHeader, messageBody) {
   return { updated: true }
 }
 
-module.exports = { createLoyaltyClass, createLoyaltyObject, generateWalletLink, updateStamps, updateWithMessage }
+// ─── Coupon pass helpers ──────────────────────────────────────
+function couponClassId(couponId) {
+  return `${ISSUER_ID}.coupon_${couponId.replace(/-/g, '_')}`
+}
+
+function couponObjectId(passId) {
+  return `${ISSUER_ID}.couponpass_${passId.replace(/-/g, '_')}`
+}
+
+function discountLabel(coupon) {
+  if (coupon.coupon_type === 'percent')   return `${coupon.discount_value}% off`
+  if (coupon.coupon_type === 'fixed')     return `$${coupon.discount_value} off`
+  if (coupon.coupon_type === 'free_item') return `Free ${coupon.free_item_name}`
+  if (coupon.coupon_type === 'bogo')      return 'Buy One Get One Free'
+  return coupon.title
+}
+
+// Create / upsert a GenericClass for a coupon template
+async function createCouponClass(coupon, business) {
+  const auth   = getAuth()
+  const client = google.walletobjects({ version: 'v1', auth })
+  const body = {
+    id:           couponClassId(coupon.id),
+    issuerName:   business.name || 'Nook',
+    reviewStatus: 'UNDER_REVIEW',
+    hexBackgroundColor: coupon.color || '#1D9E75',
+    multipleDevicesAndHoldersAllowedStatus: 'MULTIPLE_HOLDERS',
+    classTemplateInfo: {
+      cardTemplateOverride: {
+        cardRowTemplateInfos: [{
+          twoItems: {
+            startItem: { firstValue: { fields: [{ fieldPath: 'object.textModulesData["discount"]' }] } },
+            endItem:   { firstValue: { fields: [{ fieldPath: 'object.textModulesData["expires"]' }] } }
+          }
+        }]
+      }
+    }
+  }
+  try {
+    const { data } = await client.genericclass.get({ resourceId: body.id })
+    const { data: updated } = await client.genericclass.update({ resourceId: body.id, requestBody: { ...data, ...body } })
+    return updated
+  } catch (err) {
+    if (err.code !== 404) throw err
+    const { data } = await client.genericclass.insert({ requestBody: body })
+    return data
+  }
+}
+
+// Create / upsert a GenericObject for a single issued coupon pass
+async function createCouponObject(couponPass, coupon, customer, business) {
+  const auth   = getAuth()
+  const client = google.walletobjects({ version: 'v1', auth })
+
+  // Ensure class exists first
+  await createCouponClass(coupon, business).catch(e => console.error('[Wallet] coupon class error:', e.message))
+
+  const expiry = new Date(couponPass.expires_at).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric'
+  })
+
+  const body = {
+    id:      couponObjectId(couponPass.id),
+    classId: couponClassId(coupon.id),
+    state:   'ACTIVE',
+    header: { defaultValue: { language: 'en-US', value: coupon.title } },
+    hexBackgroundColor: coupon.color || '#1D9E75',
+    textModulesData: [
+      { id: 'discount', header: 'Discount',  body: discountLabel(coupon) },
+      { id: 'expires',  header: 'Expires',   body: expiry },
+      { id: 'holder',   header: 'Customer',  body: customer.name }
+    ],
+    barcode: {
+      type:          'CODE_128',
+      value:         couponPass.barcode,
+      alternateText: couponPass.barcode
+    },
+    validTimeInterval: {
+      end: { date: couponPass.expires_at }
+    }
+  }
+
+  try {
+    await client.genericobject.get({ resourceId: body.id })
+    const { data } = await client.genericobject.update({ resourceId: body.id, requestBody: body })
+    return data
+  } catch (err) {
+    if (err.code !== 404) throw err
+    const { data } = await client.genericobject.insert({ requestBody: body })
+    return data
+  }
+}
+
+// Update a coupon pass state: 'ACTIVE' | 'COMPLETED' | 'EXPIRED' | 'INACTIVE'
+async function updateCouponPassStatus(passId, state) {
+  const auth   = getAuth()
+  const client = google.walletobjects({ version: 'v1', auth })
+  const resId  = couponObjectId(passId)
+  let existing
+  try {
+    const { data } = await client.genericobject.get({ resourceId: resId })
+    existing = data
+  } catch (err) {
+    if (err.code === 404) return { skipped: true, reason: 'no_wallet_pass' }
+    throw err
+  }
+  existing.state = state
+  const { data } = await client.genericobject.update({ resourceId: resId, requestBody: existing })
+  return { updated: true }
+}
+
+// "Add to Google Wallet" JWT link for a coupon pass
+function generateCouponWalletLink(passId) {
+  const credentials = loadCredentials()
+  const claims = {
+    iss:     credentials.client_email,
+    aud:     'google',
+    typ:     'savetowallet',
+    iat:     Math.floor(Date.now() / 1000),
+    payload: { genericObjects: [{ id: couponObjectId(passId) }] }
+  }
+  const token = jwt.sign(claims, credentials.private_key, { algorithm: 'RS256' })
+  return `https://pay.google.com/gp/v/save/${token}`
+}
+
+module.exports = {
+  createLoyaltyClass, createLoyaltyObject, generateWalletLink, updateStamps, updateWithMessage,
+  createCouponClass, createCouponObject, updateCouponPassStatus, generateCouponWalletLink
+}

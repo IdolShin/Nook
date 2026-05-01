@@ -8,8 +8,10 @@ const authRoutes     = require('./routes/auth')
 const cardRoutes     = require('./routes/cards')
 const customerRoutes = require('./routes/customers')
 const scanRoutes     = require('./routes/scan')
+const couponRoutes   = require('./routes/coupons')
 const { router: pushRoutes } = require('./services/push')
 const walletRoutes   = require('./routes/wallet')
+const schedule       = require('node-schedule')
 
 const app = express()
 
@@ -47,6 +49,7 @@ app.use('/api/auth',      authLimiter, authRoutes)
 app.use('/api/cards',     cardRoutes)
 app.use('/api/customers', customerRoutes)
 app.use('/api/scan',      scanLimiter, scanRoutes)
+app.use('/api/coupons',   couponRoutes)
 app.use('/api/push',      pushRoutes)
 app.use('/api/wallet',    walletRoutes)
 
@@ -73,6 +76,63 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err)
   res.status(500).json({ error: 'Internal server error' })
+})
+
+// ─── Auto-trigger scheduler (daily 9am) ──────────────────────
+schedule.scheduleJob('0 9 * * *', async () => {
+  const supabase = require('./db/supabase')
+  console.log('[Scheduler] Running daily coupon auto-triggers')
+
+  try {
+    // Winback: find coupons with trigger_type = 'winback'
+    const { data: winbackCoupons } = await supabase
+      .from('coupons')
+      .select('id, business_id, valid_days, total_issued')
+      .eq('trigger_type', 'winback')
+      .eq('is_active', true)
+
+    for (const coupon of (winbackCoupons || [])) {
+      // Find customers with no stamp in 30+ days who don't already have an active pass
+      const cutoff = new Date(Date.now() - 30 * 86_400_000).toISOString()
+      const { data: lapsedCustomers } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('business_id', coupon.business_id)
+        .lt('updated_at', cutoff)
+        .limit(200)
+
+      if (!lapsedCustomers || lapsedCustomers.length === 0) continue
+
+      const { data: alreadyHave } = await supabase
+        .from('coupon_passes')
+        .select('customer_id')
+        .eq('coupon_id', coupon.id)
+        .eq('status', 'active')
+
+      const alreadySet = new Set((alreadyHave || []).map(p => p.customer_id))
+      const targets = lapsedCustomers.filter(c => !alreadySet.has(c.id))
+
+      if (targets.length === 0) continue
+
+      const now = new Date()
+      const expiresAt = new Date(now.getTime() + (coupon.valid_days || 7) * 86_400_000)
+
+      const passes = targets.map(() => ({
+        coupon_id:   coupon.id,
+        business_id: coupon.business_id,
+        customer_id: targets.shift().id,
+        barcode:     String(Math.floor(100000000000 + Math.random() * 900000000000)),
+        status:      'active',
+        issued_at:   now.toISOString(),
+        expires_at:  expiresAt.toISOString()
+      }))
+
+      await supabase.from('coupon_passes').insert(passes)
+      console.log(`[Scheduler] Winback: issued ${passes.length} passes for coupon ${coupon.id}`)
+    }
+  } catch (err) {
+    console.error('[Scheduler] Daily trigger error:', err.message)
+  }
 })
 
 // ─── Start server ────────────────────────────────────────────

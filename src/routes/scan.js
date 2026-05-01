@@ -62,7 +62,46 @@ router.post('/', authMiddleware, async (req, res) => {
     let rewardReady = false
     if (isReward) {
       rewardReady = true
-      // Don't auto-redeem — staff needs to manually redeem via /api/redeem
+
+      // Auto-issue stamp_complete trigger coupons (fire-and-forget)
+      ;(async () => {
+        try {
+          const { data: bonusCoupons } = await supabase
+            .from('coupons')
+            .select('id, valid_days, total_issued')
+            .eq('business_id', req.business.id)
+            .eq('trigger_type', 'stamp_complete')
+            .eq('is_active', true)
+
+          for (const coupon of (bonusCoupons || [])) {
+            const { data: existing } = await supabase
+              .from('coupon_passes')
+              .select('id')
+              .eq('coupon_id', coupon.id)
+              .eq('customer_id', customer.id)
+              .eq('status', 'active')
+              .maybeSingle()
+
+            if (existing) continue
+
+            const barcode    = String(Math.floor(100000000000 + Math.random() * 900000000000))
+            const expiresAt  = new Date(Date.now() + (coupon.valid_days || 30) * 86_400_000)
+
+            await supabase.from('coupon_passes').insert({
+              coupon_id:   coupon.id,
+              customer_id: customer.id,
+              business_id: req.business.id,
+              barcode,
+              status:      'active',
+              issued_at:   new Date().toISOString(),
+              expires_at:  expiresAt.toISOString()
+            })
+            await supabase.from('coupons')
+              .update({ total_issued: (coupon.total_issued || 0) + 1 })
+              .eq('id', coupon.id)
+          }
+        } catch (e) { console.error('[Scan] stamp_complete coupon error:', e.message) }
+      })()
     }
 
     // 6. Sync Google Wallet (fire-and-forget — don't delay the scan response)
