@@ -74,13 +74,10 @@ router.post('/redeem', async (req, res) => {
     const { barcode } = req.body
     if (!barcode) return res.status(400).json({ error: 'barcode required' })
 
+    // Flat query — avoid FK embedding which can return null on schema mismatch
     const { data: pass, error: passErr } = await supabase
       .from('coupon_passes')
-      .select(`
-        id, status, expires_at, redeemed_at, barcode, customer_id, coupon_id,
-        coupons(id, title, coupon_type, discount_value, free_item_name, description, color, business_id),
-        customers(id, name, phone, device_token, consent_push, business_id)
-      `)
+      .select('id, status, expires_at, redeemed_at, barcode, customer_id, coupon_id')
       .eq('barcode', barcode)
       .single()
 
@@ -88,7 +85,21 @@ router.post('/redeem', async (req, res) => {
       return res.status(404).json({ error: 'not_found', message: 'Coupon not found. Check the barcode.' })
     }
 
-    if (pass.coupons.business_id !== req.business.id) {
+    // Separate coupon + customer lookups (more robust than FK embedding)
+    const [{ data: coupon }, { data: customer }] = await Promise.all([
+      supabase.from('coupons')
+        .select('id, title, coupon_type, discount_value, free_item_name, description, color, business_id, total_redeemed')
+        .eq('id', pass.coupon_id).single(),
+      supabase.from('customers')
+        .select('id, name, phone, device_token, consent_push')
+        .eq('id', pass.customer_id).single()
+    ])
+
+    if (!coupon) {
+      return res.status(404).json({ error: 'not_found', message: 'Coupon not found.' })
+    }
+
+    if (coupon.business_id !== req.business.id) {
       return res.status(403).json({ error: 'not_found', message: 'Coupon not found.' })
     }
 
@@ -113,16 +124,14 @@ router.post('/redeem', async (req, res) => {
     const redeemedAt = new Date().toISOString()
     await supabase
       .from('coupon_passes')
-      .update({ status: 'redeemed', redeemed_at: redeemedAt, redeemed_by: req.business.id })
+      .update({ status: 'redeemed', redeemed_at: redeemedAt })
       .eq('id', pass.id)
 
     // Increment total_redeemed
-    const { data: currentCoupon } = await supabase
-      .from('coupons').select('total_redeemed').eq('id', pass.coupons.id).single()
     await supabase
       .from('coupons')
-      .update({ total_redeemed: (currentCoupon?.total_redeemed || 0) + 1 })
-      .eq('id', pass.coupons.id)
+      .update({ total_redeemed: (coupon.total_redeemed || 0) + 1 })
+      .eq('id', coupon.id)
 
     // Fire-and-forget: update wallet pass
     ;(async () => {
@@ -133,14 +142,14 @@ router.post('/redeem', async (req, res) => {
     })()
 
     // Send confirmation push
-    if (pass.customers?.consent_push && pass.customers?.device_token) {
+    if (customer?.consent_push && customer?.device_token) {
       const { pushService } = require('../services/push')
-      const label = pass.coupons.coupon_type === 'percent'
-        ? `${pass.coupons.discount_value}% off`
-        : pass.coupons.free_item_name || pass.coupons.title
+      const label = coupon.coupon_type === 'percent'
+        ? `${coupon.discount_value}% off`
+        : coupon.free_item_name || coupon.title
       pushService.sendToCustomer(
-        pass.customers,
-        `Coupon redeemed: ${pass.coupons.title} (${label}). Thank you!`,
+        customer,
+        `Coupon redeemed: ${coupon.title} (${label}). Thank you!`,
         req.business.name
       ).catch(() => {})
     }
@@ -154,8 +163,8 @@ router.post('/redeem', async (req, res) => {
 
     res.json({
       success:     true,
-      coupon:      pass.coupons,
-      customer:    { name: pass.customers.name, phone: pass.customers.phone },
+      coupon,
+      customer:    { name: customer?.name || '', phone: customer?.phone || '' },
       barcode:     pass.barcode,
       redeemed_at: redeemedAt
     })
