@@ -159,7 +159,7 @@ router.post('/redeem', async (req, res) => {
       customer_id:    pass.customer_id,
       channel:        'redemption',
       status:         'redeemed'
-    }).catch(() => {})
+    })
 
     res.json({
       success:     true,
@@ -170,7 +170,7 @@ router.post('/redeem', async (req, res) => {
     })
   } catch (err) {
     console.error('Redeem error:', err)
-    res.status(500).json({ error: 'Redeem failed', detail: err.message, at: err.stack?.split('\n')[1]?.trim() })
+    res.status(500).json({ error: 'Redeem failed' })
   }
 })
 
