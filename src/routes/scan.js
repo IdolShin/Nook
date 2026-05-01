@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const supabase = require('../db/supabase')
 const { authMiddleware } = require('../middleware/auth')
-const pushService = require('../services/push')
+const { pushService } = require('../services/push')
 const { updateStamps } = require('../services/googleWallet')
 
 // ─── POST /api/scan ──────────────────────────────────────────

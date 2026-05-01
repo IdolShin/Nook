@@ -89,14 +89,54 @@ router.post('/register', async (req, res) => {
 // 내 가게 전체 고객 목록 (dashboard)
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('customer_stamp_counts')     // uses the DB view
-      .select('*')
-      .eq('business_id', req.business.id)   // view doesn't expose this — use subquery
+    const { data: customers, error: custErr } = await supabase
+      .from('customers')
+      .select(`
+        id, name, phone, qr_code, barcode, wallet_type, card_id, created_at,
+        loyalty_cards ( goal_stamps, reward_desc )
+      `)
+      .eq('business_id', req.business.id)
+      .order('created_at', { ascending: false })
 
-    if (error) throw error
-    res.json({ customers: data })
+    if (custErr) throw custErr
+    if (!customers || customers.length === 0) return res.json({ customers: [] })
+
+    // Fetch all stamps for these customers in one query
+    const ids = customers.map(c => c.id)
+    const { data: stamps } = await supabase
+      .from('stamps')
+      .select('customer_id')
+      .in('customer_id', ids)
+
+    const counts = {}
+    for (const s of (stamps || [])) {
+      counts[s.customer_id] = (counts[s.customer_id] || 0) + 1
+    }
+
+    const result = customers.map(c => {
+      const goal  = c.loyalty_cards?.goal_stamps || 10
+      const total = counts[c.id] || 0
+      return {
+        id:             c.id,
+        name:           c.name,
+        phone:          c.phone,
+        qr_code:        c.qr_code,
+        barcode:        c.barcode,
+        wallet_type:    c.wallet_type,
+        card_id:        c.card_id,
+        business_id:    req.business.id,
+        created_at:     c.created_at,
+        total_stamps:   total,
+        current_stamps: total % goal,
+        rewards_earned: Math.floor(total / goal),
+        goal_stamps:    goal,
+        reward_desc:    c.loyalty_cards?.reward_desc
+      }
+    })
+
+    res.json({ customers: result })
   } catch (err) {
+    console.error('Get customers error:', err)
     res.status(500).json({ error: 'Failed to fetch customers' })
   }
 })

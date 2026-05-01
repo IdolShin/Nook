@@ -252,7 +252,7 @@ router.post('/:id/issue', async (req, res) => {
 
     let custQuery = supabase
       .from('customers')
-      .select('id, name, phone, email, device_token, wallet_type, business_id, consent_push')
+      .select('id, name, phone, device_token, wallet_type, business_id, consent_push')
       .eq('business_id', req.business.id)
     if (customer_ids && customer_ids.length > 0) {
       custQuery = custQuery.in('id', customer_ids)
