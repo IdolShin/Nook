@@ -22,7 +22,28 @@
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('type:', d.get\\('type'\\)\\); print\\('client_email:', d.get\\('client_email'\\)\\); print\\('project_id:', d.get\\('project_id'\\)\\)\")",
       "Bash(node *)",
       "Read(//c/Users/woosa/**)",
-      "Read(//c/Users/woosa/Documents/**)"
+      "Read(//c/Users/woosa/Documents/**)",
+      "Bash(git rm *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git filter-branch *)",
+      "Bash(git stash *)",
+      "Bash(git update-ref *)",
+      "Bash(git reflog *)",
+      "Bash(git gc *)",
+      "Bash(git ls-tree *)",
+      "Bash(grep -E \"^\\(\\\\.env$|certs/\\)\")",
+      "Bash(grep -E \"^\\\\.\\(env\\)$|^certs/\")",
+      "Bash(git checkout *)",
+      "Bash(certutil -encode certs/google-service-account.json tmp_b64.txt)",
+      "Bash(findstr /v \"CERTIFICATE\" tmp_b64.txt)",
+      "Bash(del tmp_b64.txt)",
+      "Bash(npm --version)",
+      "Bash(gh auth *)",
+      "Bash(git --version)",
+      "Bash(git config *)",
+      "Bash(git init *)"
     ]
   }
 }
