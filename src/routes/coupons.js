@@ -170,7 +170,7 @@ router.post('/redeem', async (req, res) => {
     })
   } catch (err) {
     console.error('Redeem error:', err)
-    res.status(500).json({ error: 'Redeem failed' })
+    res.status(500).json({ error: 'Redeem failed', detail: err.message, at: err.stack?.split('\n')[1]?.trim() })
   }
 })
 
