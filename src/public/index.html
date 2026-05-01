@@ -1,720 +1,1049 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Nook Dashboard</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Nook Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F5F6FA;--white:#fff;--border:#EBEBEB;
+  --green:#1D9E75;--green-d:#167a5c;--green-l:#E8F7F2;
+  --blue:#3B82F6;--amber:#F59E0B;--pink:#EC4899;
+  --text:#1A1D23;--muted:#6B7A8D;--light:#A0ABBE;
+  --red:#E53E3E;--sidebar:220px;--radius:12px;
+  --shadow:0 1px 4px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.06);
+}
+html,body{height:100%;font-family:'Inter',sans-serif;font-size:14px;color:var(--text);background:var(--bg)}
+button{font-family:inherit;cursor:pointer}
+input,textarea,select{font-family:inherit}
+a{text-decoration:none;color:inherit}
 
-    :root {
-      --green:   #1D9E75;
-      --green-d: #157a5a;
-      --green-l: #e8f7f2;
-      --red:     #e53e3e;
-      --gray-1:  #f7f8fa;
-      --gray-2:  #edf0f4;
-      --gray-3:  #c8d0db;
-      --gray-5:  #6b7a8d;
-      --gray-8:  #1e2a38;
-      --radius:  10px;
-      --shadow:  0 2px 12px rgba(0,0,0,.08);
-    }
+/* ── Login ────────────────────────────────────────────── */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)}
+.lc{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:44px 40px;width:380px}
+.lc-logo{font-size:26px;font-weight:800;color:var(--green);letter-spacing:-.5px;margin-bottom:4px}
+.lc-sub{font-size:13px;color:var(--muted);margin-bottom:32px}
+.lc-err{color:var(--red);font-size:13px;margin-bottom:14px;display:none}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.field input,.field select,.field textarea{width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;outline:none;transition:border .15s;background:var(--white);color:var(--text)}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--green)}
+.field input.err{border-color:var(--red)}
+.field textarea{resize:vertical;min-height:80px}
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: var(--gray-1);
-      color: var(--gray-8);
-      min-height: 100vh;
-    }
+/* ── Buttons ─────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 18px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--green);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--green-d)}
+.btn-full{width:100%;padding:11px}
+.btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--green);color:var(--green)}
+.btn-ghost{background:transparent;color:var(--muted);padding:7px 12px}
+.btn-ghost:hover{background:var(--bg);color:var(--text)}
+.btn-danger{background:#FFF0F0;color:var(--red);border:1px solid #FFD0D0}
+.btn-danger:hover{background:#FFE0E0}
+.btn-sm{padding:6px 12px;font-size:12px;border-radius:6px}
 
-    /* ── Login ── */
-    #login-screen {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-    }
-    .login-card {
-      background: #fff;
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 40px 36px;
-      width: 360px;
-    }
-    .login-card .logo {
-      font-size: 28px;
-      font-weight: 800;
-      color: var(--green);
-      margin-bottom: 6px;
-    }
-    .login-card .subtitle {
-      color: var(--gray-5);
-      font-size: 14px;
-      margin-bottom: 28px;
-    }
-    .field { margin-bottom: 16px; }
-    .field label {
-      display: block;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--gray-5);
-      text-transform: uppercase;
-      letter-spacing: .5px;
-      margin-bottom: 6px;
-    }
-    .field input {
-      width: 100%;
-      padding: 10px 14px;
-      border: 1.5px solid var(--gray-3);
-      border-radius: 8px;
-      font-size: 15px;
-      transition: border-color .15s;
-      outline: none;
-    }
-    .field input:focus { border-color: var(--green); }
-    .field input.error { border-color: var(--red); }
+/* ── App Shell ───────────────────────────────────────── */
+#app{display:none;min-height:100vh}
+#shell{display:flex;min-height:100vh}
 
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 11px 20px;
-      border: none;
-      border-radius: 8px;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background .15s, opacity .15s;
-    }
-    .btn:disabled { opacity: .55; cursor: not-allowed; }
-    .btn-primary { background: var(--green); color: #fff; width: 100%; }
-    .btn-primary:hover:not(:disabled) { background: var(--green-d); }
-    .btn-outline {
-      background: transparent;
-      color: var(--green);
-      border: 1.5px solid var(--green);
-    }
-    .btn-outline:hover:not(:disabled) { background: var(--green-l); }
+/* ── Sidebar ─────────────────────────────────────────── */
+#sidebar{
+  width:var(--sidebar);min-height:100vh;background:var(--white);
+  border-right:1px solid var(--border);position:fixed;top:0;left:0;
+  display:flex;flex-direction:column;z-index:50
+}
+.sb-logo{padding:22px 20px 16px;font-size:20px;font-weight:800;color:var(--green);letter-spacing:-.4px;border-bottom:1px solid var(--border)}
+.sb-section-label{font-size:10px;font-weight:700;color:var(--light);text-transform:uppercase;letter-spacing:.8px;padding:18px 20px 6px}
+.sb-nav{flex:1;overflow-y:auto;padding-bottom:12px}
+.sb-link{
+  display:flex;align-items:center;gap:10px;padding:9px 20px;
+  font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;
+  transition:all .12s;border-left:3px solid transparent;margin:1px 0
+}
+.sb-link svg{flex-shrink:0;opacity:.7}
+.sb-link:hover{background:var(--bg);color:var(--text)}
+.sb-link:hover svg{opacity:1}
+.sb-link.active{background:var(--green-l);color:var(--green);border-left-color:var(--green);font-weight:600}
+.sb-link.active svg{opacity:1}
+.sb-bottom{padding:16px 20px;border-top:1px solid var(--border)}
+.sb-biz-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-biz-plan{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 8px;border-radius:20px;background:var(--green-l);color:var(--green);letter-spacing:.5px}
+.sb-logout{margin-top:10px;font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer;padding:0}
+.sb-logout:hover{color:var(--red)}
 
-    #login-error {
-      color: var(--red);
-      font-size: 13px;
-      margin-bottom: 12px;
-      display: none;
-    }
+/* ── Main content ────────────────────────────────────── */
+#main{margin-left:var(--sidebar);flex:1;min-height:100vh;background:var(--bg)}
+#topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 32px;border-bottom:1px solid var(--border);background:var(--white);
+  position:sticky;top:0;z-index:40
+}
+.topbar-title{font-size:18px;font-weight:700;color:var(--text)}
+.topbar-sub{font-size:12px;color:var(--muted);margin-top:1px}
+.topbar-actions{display:flex;gap:8px;align-items:center}
+#page-content{padding:28px 32px 60px}
 
-    /* ── App shell ── */
-    #app { display: none; min-height: 100vh; }
+/* ── Stat Cards ──────────────────────────────────────── */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{border-radius:var(--radius);padding:22px 24px;color:#fff;position:relative;overflow:hidden}
+.stat-green{background:linear-gradient(135deg,#1D9E75 0%,#16C79A 100%)}
+.stat-blue {background:linear-gradient(135deg,#3B82F6 0%,#60A5FA 100%)}
+.stat-amber{background:linear-gradient(135deg,#F59E0B 0%,#FCD34D 100%)}
+.stat-pink {background:linear-gradient(135deg,#EC4899 0%,#F9A8D4 100%)}
+.stat-icon{position:absolute;right:16px;top:16px;opacity:.25;font-size:40px}
+.stat-num{font-size:32px;font-weight:800;letter-spacing:-.5px;line-height:1}
+.stat-label{font-size:12px;font-weight:500;opacity:.85;margin-top:6px}
+.stat-delta{font-size:11px;opacity:.7;margin-top:8px}
 
-    header {
-      background: #fff;
-      border-bottom: 1px solid var(--gray-2);
-      padding: 0 28px;
-      height: 60px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-    .header-logo { font-size: 20px; font-weight: 800; color: var(--green); }
-    .header-biz  { font-size: 13px; color: var(--gray-5); }
-    #logout-btn  { font-size: 13px; color: var(--gray-5); background: none; border: none; cursor: pointer; }
-    #logout-btn:hover { color: var(--red); }
+/* ── Cards ───────────────────────────────────────────── */
+.card{background:var(--white);border-radius:var(--radius);border:1px solid var(--border);padding:24px;margin-bottom:20px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.card-title{font-size:15px;font-weight:700;color:var(--text)}
+.card-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px}
 
-    main { max-width: 760px; margin: 36px auto; padding: 0 20px 60px; }
+/* ── Tables ──────────────────────────────────────────── */
+.table-wrap{overflow-x:auto;margin:-24px;margin-top:0}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;padding:10px 20px;background:var(--bg);border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+td{padding:13px 20px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr{transition:background .1s}
+tbody tr:hover{background:#FAFBFC}
+.td-muted{color:var(--muted);font-size:12px}
 
-    .page-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
-    .page-sub   { font-size: 14px; color: var(--gray-5); margin-bottom: 28px; }
+/* ── Avatars ─────────────────────────────────────────── */
+.avatar{width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0}
+.avatar-green{background:linear-gradient(135deg,#1D9E75,#16C79A)}
+.avatar-blue {background:linear-gradient(135deg,#3B82F6,#60A5FA)}
+.avatar-amber{background:linear-gradient(135deg,#F59E0B,#FCD34D)}
+.avatar-pink {background:linear-gradient(135deg,#EC4899,#F9A8D4)}
+.td-name-cell{display:flex;align-items:center;gap:11px}
+.td-name-inner .name{font-size:13px;font-weight:600}
+.td-name-inner .sub{font-size:11px;color:var(--muted);margin-top:1px}
 
-    /* ── Card ── */
-    .card {
-      background: #fff;
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 28px;
-      margin-bottom: 24px;
-    }
-    .card-title { font-size: 16px; font-weight: 700; margin-bottom: 20px; }
+/* ── Pills ───────────────────────────────────────────── */
+.pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.3px;white-space:nowrap}
+.pill-green{background:var(--green-l);color:var(--green)}
+.pill-blue {background:#EFF6FF;color:var(--blue)}
+.pill-amber{background:#FFFBEB;color:var(--amber)}
+.pill-pink {background:#FDF2F8;color:var(--pink)}
+.pill-gray {background:var(--bg);color:var(--muted)}
+.pill-red  {background:#FFF0F0;color:var(--red)}
 
-    /* ── Mode tabs ── */
-    .tabs {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 20px;
-    }
-    .tab {
-      padding: 8px 18px;
-      border-radius: 20px;
-      border: 1.5px solid var(--gray-3);
-      background: #fff;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--gray-5);
-      cursor: pointer;
-      transition: all .15s;
-    }
-    .tab.active {
-      border-color: var(--green);
-      background: var(--green-l);
-      color: var(--green);
-    }
+/* ── Progress bar ────────────────────────────────────── */
+.prog-wrap{display:flex;align-items:center;gap:8px}
+.prog-bar{flex:1;height:6px;background:var(--bg);border-radius:4px;overflow:hidden}
+.prog-fill{height:100%;border-radius:4px;background:var(--green);transition:width .3s}
+.prog-label{font-size:11px;color:var(--muted);white-space:nowrap}
 
-    /* ── Customer list ── */
-    #customer-panel {
-      display: none;
-      margin-bottom: 20px;
-    }
-    .customer-search {
-      width: 100%;
-      padding: 9px 14px;
-      border: 1.5px solid var(--gray-3);
-      border-radius: 8px;
-      font-size: 14px;
-      outline: none;
-      margin-bottom: 10px;
-    }
-    .customer-search:focus { border-color: var(--green); }
+/* ── Card swatch ─────────────────────────────────────── */
+.card-swatch{width:36px;height:36px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:16px;flex-shrink:0}
 
-    .customer-list-box {
-      border: 1.5px solid var(--gray-2);
-      border-radius: 8px;
-      max-height: 260px;
-      overflow-y: auto;
-    }
-    .customer-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--gray-2);
-      cursor: pointer;
-      transition: background .1s;
-    }
-    .customer-item:last-child { border-bottom: none; }
-    .customer-item:hover { background: var(--gray-1); }
-    .customer-item input[type=checkbox] { accent-color: var(--green); width: 16px; height: 16px; }
-    .customer-name { font-size: 14px; font-weight: 600; flex: 1; }
-    .customer-meta { font-size: 12px; color: var(--gray-5); }
-    .customer-wallet {
-      font-size: 11px;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 12px;
-      background: var(--green-l);
-      color: var(--green);
-    }
-    .customer-wallet.none { background: var(--gray-2); color: var(--gray-5); }
+/* ── Search ──────────────────────────────────────────── */
+.search-bar{display:flex;align-items:center;gap:8px;padding:9px 13px;border:1.5px solid var(--border);border-radius:8px;background:var(--white)}
+.search-bar input{border:none;outline:none;font-size:13px;flex:1;background:transparent;color:var(--text)}
+.search-bar svg{color:var(--muted);flex-shrink:0}
 
-    .select-controls {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 10px;
-    }
-    .select-controls button {
-      font-size: 12px;
-      color: var(--green);
-      background: none;
-      border: none;
-      cursor: pointer;
-      font-weight: 600;
-      padding: 0;
-    }
-    .select-controls button:hover { text-decoration: underline; }
-    .selected-count {
-      font-size: 12px;
-      color: var(--gray-5);
-      margin-left: auto;
-    }
+/* ── Charts ──────────────────────────────────────────── */
+.chart-area{padding-top:8px}
+.chart-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:6px}
+.donut-wrap{display:flex;align-items:center;gap:20px}
+.donut-legend .legend-item{display:flex;align-items:center;gap:7px;font-size:12px;margin-bottom:8px}
+.donut-legend .legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 
-    #no-customers {
-      padding: 24px;
-      text-align: center;
-      color: var(--gray-5);
-      font-size: 14px;
-    }
+/* ── Push page ───────────────────────────────────────── */
+.push-layout{display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start}
+.tab-row{display:flex;gap:6px;margin-bottom:18px}
+.tab{padding:7px 16px;border-radius:20px;border:1.5px solid var(--border);background:var(--white);font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;transition:all .15s}
+.tab.active{border-color:var(--green);background:var(--green-l);color:var(--green);font-weight:600}
+.cbox-list{border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto}
+.cbox-item{display:flex;align-items:center;gap:10px;padding:9px 13px;border-bottom:1px solid var(--border);cursor:pointer}
+.cbox-item:last-child{border-bottom:none}
+.cbox-item:hover{background:var(--bg)}
+.cbox-item input{accent-color:var(--green);width:15px;height:15px}
+.char-row{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:6px}
+.char-warn{color:var(--amber)}
+.char-over{color:var(--red)}
+.template-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px}
+.template-btn{padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;text-align:left;background:var(--white);cursor:pointer;transition:all .15s;color:var(--text);line-height:1.4}
+.template-btn:hover{border-color:var(--green);background:var(--green-l)}
+/* Phone mockup */
+.phone-stack{display:flex;gap:16px;justify-content:center}
+.phone{width:160px;border:6px solid #1a1a2e;border-radius:24px;background:#f0f0f0;overflow:hidden;position:relative}
+.phone-header{background:#1a1a2e;height:16px;display:flex;align-items:center;justify-content:center}
+.phone-dot{width:40px;height:4px;background:#333;border-radius:2px}
+.phone-screen{padding:10px 8px;min-height:180px}
+.phone-notif{background:var(--white);border-radius:10px;padding:10px;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.phone-notif-head{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.phone-notif-icon{width:18px;height:18px;border-radius:4px;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff}
+.phone-notif-app{font-size:10px;font-weight:600;color:var(--muted)}
+.phone-notif-time{font-size:9px;color:var(--light);margin-left:auto}
+.phone-notif-title{font-size:11px;font-weight:700;margin-bottom:2px}
+.phone-notif-body{font-size:10px;color:var(--muted);line-height:1.4}
+.phone-label{text-align:center;font-size:11px;color:var(--muted);margin-top:8px}
+.ios-status{background:#f0f0f0;padding:4px 10px;display:flex;justify-content:space-between;font-size:9px;font-weight:600}
 
-    /* ── Message ── */
-    .msg-label {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--gray-5);
-      text-transform: uppercase;
-      letter-spacing: .5px;
-      margin-bottom: 8px;
-    }
-    #char-count { font-weight: 400; }
-    #char-count.warn { color: #e08a00; }
-    #char-count.over { color: var(--red); }
+/* ── Analytics ───────────────────────────────────────── */
+.range-tabs{display:flex;gap:4px;background:var(--bg);padding:3px;border-radius:8px;width:fit-content;margin-bottom:20px}
+.range-tab{padding:5px 14px;border-radius:6px;font-size:12px;font-weight:500;color:var(--muted);border:none;background:transparent;cursor:pointer}
+.range-tab.active{background:var(--white);color:var(--text);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.perf-row{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.perf-name{font-size:13px;font-weight:500;width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.perf-bar{flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden}
+.perf-fill{height:100%;border-radius:4px;background:var(--green)}
+.perf-val{font-size:12px;color:var(--muted);width:40px;text-align:right}
 
-    textarea#message {
-      width: 100%;
-      min-height: 100px;
-      padding: 12px 14px;
-      border: 1.5px solid var(--gray-3);
-      border-radius: 8px;
-      font-size: 15px;
-      font-family: inherit;
-      resize: vertical;
-      outline: none;
-      transition: border-color .15s;
-    }
-    textarea#message:focus { border-color: var(--green); }
-    textarea#message.error { border-color: var(--red); }
+/* ── Settings ────────────────────────────────────────── */
+.integration-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border)}
+.integration-row:last-child{border-bottom:none}
+.integration-info{display:flex;align-items:center;gap:12px}
+.integration-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.integration-name{font-size:13px;font-weight:600}
+.integration-desc{font-size:12px;color:var(--muted);margin-top:1px}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid var(--border)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-label{font-size:13px;font-weight:500}
+.toggle-desc{font-size:12px;color:var(--muted);margin-top:2px}
+.toggle{position:relative;width:40px;height:22px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:#D1D5DB;border-radius:11px;cursor:pointer;transition:.2s}
+.toggle-slider::before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.toggle input:checked+.toggle-slider{background:var(--green)}
+.toggle input:checked+.toggle-slider::before{transform:translateX(18px)}
+.plan-card{background:linear-gradient(135deg,var(--green),#16C79A);border-radius:var(--radius);padding:22px 24px;color:#fff;margin-bottom:20px}
+.plan-name{font-size:20px;font-weight:800;margin-bottom:4px}
+.plan-detail{font-size:13px;opacity:.85}
 
-    .send-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-top: 18px;
-      gap: 14px;
-    }
-    .send-info { font-size: 13px; color: var(--gray-5); }
-    #send-btn { min-width: 140px; }
+/* ── Modal ───────────────────────────────────────────── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.modal{background:var(--white);border-radius:var(--radius);padding:28px;width:440px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.modal-title{font-size:16px;font-weight:700}
+.modal-close{width:28px;height:28px;border-radius:6px;border:none;background:var(--bg);cursor:pointer;font-size:18px;color:var(--muted);display:flex;align-items:center;justify-content:center}
+.modal-close:hover{background:var(--border);color:var(--text)}
+.color-row{display:flex;gap:8px;flex-wrap:wrap}
+.color-swatch-btn{width:28px;height:28px;border-radius:6px;border:3px solid transparent;cursor:pointer;transition:border .15s}
+.color-swatch-btn.sel{border-color:var(--text)}
 
-    /* ── Results ── */
-    #result-box {
-      display: none;
-      border-radius: 8px;
-      padding: 16px 20px;
-      margin-top: 18px;
-      font-size: 14px;
-    }
-    #result-box.success { background: var(--green-l); color: var(--green-d); border: 1px solid #b3dfd1; }
-    #result-box.error   { background: #fff5f5; color: var(--red); border: 1px solid #fca5a5; }
-    .result-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
-    .result-row:last-child { margin-bottom: 0; }
-    .result-label { font-weight: 600; }
+/* ── Result box ──────────────────────────────────────── */
+.result-box{border-radius:8px;padding:14px 18px;margin-top:14px;font-size:13px;display:none}
+.result-box.ok{background:var(--green-l);color:var(--green-d);border:1px solid #b3dfd1}
+.result-box.err{background:#fff0f0;color:var(--red);border:1px solid #fca5a5}
+.result-row{display:flex;justify-content:space-between;margin-bottom:3px}
+.result-row:last-child{margin-bottom:0}
 
-    /* ── Toast ── */
-    #toast {
-      position: fixed;
-      bottom: 28px;
-      left: 50%;
-      transform: translateX(-50%) translateY(20px);
-      background: var(--gray-8);
-      color: #fff;
-      padding: 12px 22px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity .25s, transform .25s;
-      white-space: nowrap;
-      z-index: 999;
-    }
-    #toast.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-    #toast.success { background: var(--green); }
-    #toast.error   { background: var(--red); }
+/* ── Empty state ─────────────────────────────────────── */
+.empty-state{text-align:center;padding:52px 20px;color:var(--muted)}
+.empty-state-icon{font-size:40px;margin-bottom:12px}
+.empty-state h3{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px}
+.empty-state p{font-size:13px;line-height:1.6}
 
-    /* ── Spinner ── */
-    .spinner {
-      width: 16px; height: 16px;
-      border: 2px solid rgba(255,255,255,.4);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin .6s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ── Loading skeleton ── */
-    .skeleton {
-      background: linear-gradient(90deg, var(--gray-2) 25%, var(--gray-1) 50%, var(--gray-2) 75%);
-      background-size: 200% 100%;
-      animation: shimmer 1.2s infinite;
-      border-radius: 6px;
-      height: 40px;
-      margin-bottom: 8px;
-    }
-    @keyframes shimmer { to { background-position: -200% 0; } }
-  </style>
+/* ── Toast / Spinner ─────────────────────────────────── */
+#toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--text);color:#fff;padding:11px 20px;border-radius:8px;font-size:13px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;white-space:nowrap;z-index:9999}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.ok{background:var(--green)}
+#toast.err{background:var(--red)}
+.spin{width:15px;height:15px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.skel{background:linear-gradient(90deg,var(--border) 25%,var(--bg) 50%,var(--border) 75%);background-size:200%;animation:shim 1.3s infinite;border-radius:6px;height:36px;margin-bottom:8px}
+@keyframes shim{to{background-position:-200% 0}}
+</style>
 </head>
 <body>
 
-<!-- ── Login ───────────────────────────────────────────── -->
+<!-- ── Login ─────────────────────────────────────────── -->
 <div id="login-screen">
-  <div class="login-card">
-    <div class="logo">Nook</div>
-    <div class="subtitle">Business Dashboard</div>
-
-    <div id="login-error"></div>
-
+  <div class="lc">
+    <div class="lc-logo">Nook</div>
+    <div class="lc-sub">Business Dashboard · Admin Login</div>
+    <div class="lc-err" id="login-err"></div>
     <form id="login-form">
-      <div class="field">
-        <label>Email</label>
-        <input type="email" id="login-email" autocomplete="email" required placeholder="you@example.com" />
-      </div>
-      <div class="field">
-        <label>Password</label>
-        <input type="password" id="login-password" autocomplete="current-password" required placeholder="••••••••" />
-      </div>
-      <button class="btn btn-primary" id="login-btn" type="submit">Sign in</button>
+      <div class="field"><label>Email</label><input type="email" id="l-email" placeholder="you@nook.com" autocomplete="email" required/></div>
+      <div class="field"><label>Password</label><input type="password" id="l-pw" placeholder="••••••••" autocomplete="current-password" required/></div>
+      <button class="btn btn-primary btn-full" id="login-btn" type="submit">Sign in</button>
     </form>
   </div>
 </div>
 
-<!-- ── App ──────────────────────────────────────────────── -->
+<!-- ── App ────────────────────────────────────────────── -->
 <div id="app">
-  <header>
-    <span class="header-logo">Nook</span>
-    <span class="header-biz" id="header-biz"></span>
-    <button id="logout-btn">Sign out</button>
-  </header>
+<div id="shell">
 
-  <main>
-    <div class="page-title">Broadcast Notification</div>
-    <div class="page-sub">Send a push notification and update Google Wallet cards for your customers.</div>
-
-    <div class="card">
-      <div class="card-title">Target Audience</div>
-
-      <div class="tabs">
-        <button class="tab active" data-mode="all">All Customers</button>
-        <button class="tab" data-mode="customers">By Customer</button>
+  <!-- Sidebar -->
+  <nav id="sidebar">
+    <div class="sb-logo">Nook</div>
+    <div class="sb-nav" id="sb-nav">
+      <div class="sb-section-label">Main</div>
+      <div class="sb-link active" data-page="overview">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Overview
       </div>
-
-      <!-- Customer selector -->
-      <div id="customer-panel">
-        <div class="select-controls">
-          <button id="select-all-btn">Select all</button>
-          <button id="deselect-all-btn">Deselect all</button>
-          <span class="selected-count" id="selected-count">0 selected</span>
-        </div>
-        <input class="customer-search" id="customer-search" type="text" placeholder="Search by name or phone…" />
-        <div class="customer-list-box" id="customer-list">
-          <div class="skeleton"></div>
-          <div class="skeleton"></div>
-          <div class="skeleton"></div>
-        </div>
+      <div class="sb-link" data-page="cards">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        Loyalty Cards
+      </div>
+      <div class="sb-link" data-page="customers">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Customers
+      </div>
+      <div class="sb-section-label">Engage</div>
+      <div class="sb-link" data-page="push">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        Push Notify
+      </div>
+      <div class="sb-link" data-page="analytics">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Analytics
+      </div>
+      <div class="sb-section-label">Businesses</div>
+      <div class="sb-link" data-page="settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
       </div>
     </div>
-
-    <div class="card">
-      <div class="card-title">Message</div>
-
-      <div class="msg-label">
-        <span>Message</span>
-        <span id="char-count">0 / 140</span>
-      </div>
-      <textarea id="message" maxlength="140" placeholder="e.g. Double stamps today — come visit us!"></textarea>
-
-      <div class="send-row">
-        <span class="send-info" id="send-info">Sends to all customers</span>
-        <button class="btn btn-primary" id="send-btn">
-          <span id="send-label">Send</span>
-        </button>
-      </div>
-
-      <div id="result-box"></div>
+    <div class="sb-bottom">
+      <div class="sb-biz-name" id="sb-biz-name">—</div>
+      <span class="sb-biz-plan" id="sb-plan">starter</span>
+      <br/>
+      <button class="sb-logout" id="logout-btn">Sign out</button>
     </div>
-  </main>
+  </nav>
+
+  <!-- Main -->
+  <div id="main">
+    <div id="topbar">
+      <div>
+        <div class="topbar-title" id="topbar-title">Overview</div>
+        <div class="topbar-sub" id="topbar-sub">Welcome back</div>
+      </div>
+      <div class="topbar-actions" id="topbar-actions"></div>
+    </div>
+    <div id="page-content"></div>
+  </div>
+
+</div>
 </div>
 
-<!-- ── Toast ─────────────────────────────────────────────── -->
+<!-- ── Card modal ──────────────────────────────────────── -->
+<div class="modal-overlay" id="modal" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">New Loyalty Card</span>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="field"><label>Card Name</label><input type="text" id="m-name" placeholder="e.g. Nook Cafe Stamp Card"/></div>
+    <div class="field">
+      <label>Type</label>
+      <select id="m-type">
+        <option value="stamp">Stamp Card</option>
+        <option value="cashback">Cashback</option>
+        <option value="coupon">Coupon</option>
+        <option value="membership">Membership</option>
+      </select>
+    </div>
+    <div class="field"><label>Goal Stamps</label><input type="number" id="m-stamps" value="10" min="1" max="100"/></div>
+    <div class="field"><label>Reward Description</label><input type="text" id="m-reward" placeholder="e.g. Free coffee"/></div>
+    <div class="field">
+      <label>Color</label>
+      <div class="color-row" id="color-row"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-outline" style="flex:1" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" style="flex:1" id="create-card-btn" onclick="submitCard()">Create Card</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
 <div id="toast"></div>
 
 <script>
-  const API = window.location.hostname === 'localhost' ? 'http://localhost:3001' : window.location.origin
+const API = window.location.hostname === 'localhost' ? 'http://localhost:3001' : window.location.origin
 
-  // ── State ──────────────────────────────────────────────
-  let token     = localStorage.getItem('nook_token')
-  let business  = JSON.parse(localStorage.getItem('nook_biz') || 'null')
-  let customers = []        // all fetched customers
-  let selected  = new Set() // selected customer IDs
-  let mode      = 'all'     // 'all' | 'customers'
-  let searchQ   = ''
+// ── State ───────────────────────────────────────────────
+let token    = localStorage.getItem('nook_token')
+let business = JSON.parse(localStorage.getItem('nook_biz') || 'null')
+let state    = { cards: [], customers: [], page: 'overview' }
+const COLORS = ['#1D9E75','#3B82F6','#F59E0B','#EC4899','#8B5CF6','#EF4444','#0EA5E9','#F97316']
+let selectedColor = COLORS[0]
 
-  // ── Init ───────────────────────────────────────────────
-  if (token && business) showApp()
+if (token && business) initApp()
 
-  // ── Login ──────────────────────────────────────────────
-  document.getElementById('login-form').addEventListener('submit', async e => {
-    e.preventDefault()
-    const btn = document.getElementById('login-btn')
-    const err = document.getElementById('login-error')
-    const email    = document.getElementById('login-email').value.trim()
-    const password = document.getElementById('login-password').value
+// ── Login ────────────────────────────────────────────────
+document.getElementById('login-form').addEventListener('submit', async e => {
+  e.preventDefault()
+  const btn = document.getElementById('login-btn')
+  const err = document.getElementById('login-err')
+  err.style.display = 'none'
+  btn.disabled = true
+  btn.innerHTML = '<div class="spin"></div>'
+  try {
+    const res  = await fetch(`${API}/api/auth/login`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ email: document.getElementById('l-email').value.trim(), password: document.getElementById('l-pw').value })
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Login failed')
+    token = data.token; business = data.business
+    localStorage.setItem('nook_token', token)
+    localStorage.setItem('nook_biz', JSON.stringify(business))
+    initApp()
+  } catch(ex) { err.textContent = ex.message; err.style.display = 'block' }
+  finally { btn.disabled = false; btn.textContent = 'Sign in' }
+})
 
-    btn.disabled = true
-    btn.innerHTML = '<div class="spinner"></div>'
-    err.style.display = 'none'
+// ── Init app ─────────────────────────────────────────────
+function initApp() {
+  document.getElementById('login-screen').style.display = 'none'
+  document.getElementById('app').style.display = 'block'
+  document.getElementById('sb-biz-name').textContent = business?.name || '—'
+  document.getElementById('sb-plan').textContent = business?.plan || 'starter'
+  fetchAll().then(() => navigate('overview'))
+}
 
-    try {
-      const res  = await fetch(`${API}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Login failed')
+document.getElementById('logout-btn').addEventListener('click', () => {
+  localStorage.clear(); location.reload()
+})
 
-      token    = data.token
-      business = data.business
-      localStorage.setItem('nook_token', token)
-      localStorage.setItem('nook_biz', JSON.stringify(business))
-      showApp()
-    } catch (ex) {
-      err.textContent = ex.message
-      err.style.display = 'block'
-    } finally {
-      btn.disabled = false
-      btn.textContent = 'Sign in'
-    }
-  })
+// ── Sidebar nav ──────────────────────────────────────────
+document.getElementById('sb-nav').addEventListener('click', e => {
+  const link = e.target.closest('.sb-link')
+  if (link) navigate(link.dataset.page)
+})
 
-  // ── Show App ───────────────────────────────────────────
-  function showApp() {
-    document.getElementById('login-screen').style.display = 'none'
-    document.getElementById('app').style.display = 'block'
-    document.getElementById('header-biz').textContent = business?.name || ''
-    loadCustomers()
+function navigate(page) {
+  state.page = page
+  document.querySelectorAll('.sb-link').forEach(l => l.classList.toggle('active', l.dataset.page === page))
+  const pages = {
+    overview: ['Overview', `Welcome back, ${business?.name || ''}`, '', renderOverview],
+    cards:    ['Loyalty Cards', 'Manage your stamp and reward programs', '<button class="btn btn-primary btn-sm" onclick="openModal()">+ New Card</button>', renderCards],
+    customers:['Customers', `${state.customers.length} registered card holders`, '', renderCustomers],
+    push:     ['Push Notify', 'Send messages to Google Wallet & web push', '', renderPush],
+    analytics:['Analytics', 'Stamp activity and engagement stats', '', renderAnalytics],
+    settings: ['Settings', 'Account, plan, and integrations', '', renderSettings],
   }
+  const [title, sub, actions, fn] = pages[page] || pages.overview
+  document.getElementById('topbar-title').textContent = title
+  document.getElementById('topbar-sub').textContent = sub
+  document.getElementById('topbar-actions').innerHTML = actions
+  document.getElementById('page-content').innerHTML = fn()
+  afterRender(page)
+}
 
-  // ── Logout ─────────────────────────────────────────────
-  document.getElementById('logout-btn').addEventListener('click', () => {
-    localStorage.removeItem('nook_token')
-    localStorage.removeItem('nook_biz')
-    location.reload()
-  })
+// ── Data fetching ─────────────────────────────────────────
+async function fetchAll() {
+  const [cardsRes, custsRes] = await Promise.allSettled([
+    authFetch('/api/cards').then(r => r.json()),
+    authFetch('/api/customers').then(r => r.json())
+  ])
+  if (cardsRes.status === 'fulfilled') state.cards = cardsRes.value.cards || []
+  if (custsRes.status === 'fulfilled') state.customers = custsRes.value.customers || []
+}
+async function reloadCards()     { const d = await authFetch('/api/cards').then(r=>r.json()); state.cards = d.cards||[] }
+async function reloadCustomers() { const d = await authFetch('/api/customers').then(r=>r.json()); state.customers = d.customers||[] }
 
-  // ── Load customers ─────────────────────────────────────
-  async function loadCustomers() {
-    try {
-      const res  = await authFetch('/api/customers')
-      const data = await res.json()
-      customers  = data.customers || []
-      renderList()
-    } catch {
-      document.getElementById('customer-list').innerHTML =
-        '<div id="no-customers">Failed to load customers.</div>'
-    }
-  }
+// ─────────────────────────────────────────────────────────
+// Page: Overview
+// ─────────────────────────────────────────────────────────
+function renderOverview() {
+  const totalC  = state.customers.length
+  const totalCards = state.cards.length
+  const googleW = state.customers.filter(c => c.wallet_type === 'google').length
+  const activeC = state.cards.filter(c => c.is_active !== false).length
+  const recentCustomers = [...state.customers].slice(0, 6)
+  const colors  = ['avatar-green','avatar-blue','avatar-amber','avatar-pink']
 
-  // ── Render customer list ───────────────────────────────
-  function renderList() {
-    const box       = document.getElementById('customer-list')
-    const filtered  = customers.filter(c =>
-      !searchQ ||
-      c.name?.toLowerCase().includes(searchQ) ||
-      c.phone?.includes(searchQ)
-    )
+  return `
+  <div class="stat-grid">
+    <div class="stat-card stat-green"><div class="stat-icon">👥</div><div class="stat-num">${totalC}</div><div class="stat-label">Total Customers</div><div class="stat-delta">All time registered</div></div>
+    <div class="stat-card stat-blue"><div class="stat-icon">💳</div><div class="stat-num">${activeC}</div><div class="stat-label">Active Cards</div><div class="stat-delta">${totalCards} total cards</div></div>
+    <div class="stat-card stat-amber"><div class="stat-icon">📱</div><div class="stat-num">${googleW}</div><div class="stat-label">Google Wallet</div><div class="stat-delta">${totalC ? Math.round(googleW/totalC*100) : 0}% of customers</div></div>
+    <div class="stat-card stat-pink"><div class="stat-icon">🎁</div><div class="stat-num">—</div><div class="stat-label">Redemptions</div><div class="stat-delta">Analytics coming soon</div></div>
+  </div>
 
-    if (!filtered.length) {
-      box.innerHTML = '<div id="no-customers">No customers found.</div>'
-      updateSelCount()
-      return
-    }
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header"><div><div class="card-title">Recent Customers</div><div class="card-sub">Latest registrations</div></div><button class="btn btn-ghost btn-sm" onclick="navigate('customers')">View all</button></div>
+      ${recentCustomers.length ? `
+      <div class="table-wrap"><table>
+        <thead><tr><th>Customer</th><th>Wallet</th><th>Stamps</th></tr></thead>
+        <tbody>${recentCustomers.map((c,i) => `
+        <tr>
+          <td><div class="td-name-cell"><div class="avatar ${colors[i%4]}">${initials(c.name)}</div><div class="td-name-inner"><div class="name">${esc(c.name)}</div><div class="sub">${esc(c.phone||'—')}</div></div></div></td>
+          <td>${walletPill(c.wallet_type)}</td>
+          <td><span style="font-weight:600">${c.stamp_count||c.stamps||0}</span></td>
+        </tr>`).join('')}</tbody>
+      </table></div>` : emptyState('👥','No customers yet','Register your first customer to get started.')}
+    </div>
 
-    box.innerHTML = filtered.map(c => {
-      const checked = selected.has(c.id) ? 'checked' : ''
-      const wallet  = c.wallet_type === 'google'
-        ? '<span class="customer-wallet">Google Wallet</span>'
-        : '<span class="customer-wallet none">No wallet</span>'
-      return `
-        <label class="customer-item" data-id="${c.id}">
-          <input type="checkbox" value="${c.id}" ${checked} />
+    <div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-title" style="margin-bottom:16px">Your Cards</div>
+        ${state.cards.length ? state.cards.slice(0,4).map(c => `
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+          <div class="card-swatch" style="background:${c.color||'#1D9E75'}">${cardIcon(c.card_type)}</div>
           <div style="flex:1">
-            <div class="customer-name">${esc(c.name)}</div>
-            <div class="customer-meta">${esc(c.phone || '—')}</div>
+            <div style="font-size:13px;font-weight:600">${esc(c.name)}</div>
+            <div style="font-size:11px;color:var(--muted)">${c.goal_stamps} stamps · ${typePill(c.card_type,true)}</div>
           </div>
-          ${wallet}
-        </label>`
-    }).join('')
+          <span class="pill ${c.is_active!==false?'pill-green':'pill-gray'}">${c.is_active!==false?'Active':'Off'}</span>
+        </div>`).join('') : `<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">No cards yet<br/><button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="openModal()">+ Create</button></div>`}
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:14px">Quick Actions</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button class="btn btn-outline" style="justify-content:flex-start" onclick="openModal()">+ Create Loyalty Card</button>
+          <button class="btn btn-outline" style="justify-content:flex-start" onclick="navigate('push')">📢 Broadcast Message</button>
+          <button class="btn btn-outline" style="justify-content:flex-start" onclick="navigate('analytics')">📊 View Analytics</button>
+        </div>
+      </div>
+    </div>
+  </div>`
+}
 
-    box.querySelectorAll('input[type=checkbox]').forEach(cb => {
-      cb.addEventListener('change', e => {
-        e.stopPropagation()
-        const id = cb.closest('.customer-item').dataset.id
-        selected.has(id) ? selected.delete(id) : selected.add(id)
-        updateSelCount()
-        updateSendInfo()
+// ─────────────────────────────────────────────────────────
+// Page: Loyalty Cards
+// ─────────────────────────────────────────────────────────
+function renderCards() {
+  if (!state.cards.length) return `
+    <div class="card">${emptyState('💳','No loyalty cards','Create your first loyalty card to start collecting stamps.')}</div>`
+
+  return `<div class="card">
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Card</th><th>Type</th><th>Goal</th><th>Customers</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>${state.cards.map(c => {
+        const custCount = Array.isArray(c.customers) ? (c.customers[0]?.count || 0) : 0
+        return `<tr>
+          <td><div class="td-name-cell">
+            <div class="card-swatch" style="background:${c.color||'#1D9E75'}">${cardIcon(c.card_type)}</div>
+            <div class="td-name-inner"><div class="name">${esc(c.name)}</div><div class="sub">${esc(c.reward_desc||'—')}</div></div>
+          </div></td>
+          <td>${typePill(c.card_type)}</td>
+          <td><span style="font-weight:600">${c.goal_stamps}</span> stamps</td>
+          <td>${custCount}</td>
+          <td><span class="pill ${c.is_active!==false?'pill-green':'pill-gray'}">${c.is_active!==false?'Active':'Inactive'}</span></td>
+          <td><button class="btn btn-ghost btn-sm" onclick="toggleCard('${c.id}',${c.is_active!==false})">${c.is_active!==false?'Deactivate':'Activate'}</button></td>
+        </tr>`}).join('')}
+      </tbody>
+    </table>
+    </div>
+  </div>`
+}
+
+async function toggleCard(id, isActive) {
+  try {
+    const res = await authFetch(`/api/cards/${id}`, {
+      method: 'PATCH', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ is_active: !isActive })
+    })
+    if (!res.ok) throw new Error('Failed')
+    await reloadCards()
+    navigate('cards')
+    showToast(isActive ? 'Card deactivated' : 'Card activated', 'ok')
+  } catch { showToast('Failed to update card', 'err') }
+}
+
+// ─────────────────────────────────────────────────────────
+// Page: Customers
+// ─────────────────────────────────────────────────────────
+function renderCustomers() {
+  const colors = ['avatar-green','avatar-blue','avatar-amber','avatar-pink']
+  return `
+  <div class="card" style="margin-bottom:0">
+    <div class="card-header" style="margin-bottom:16px">
+      <div class="search-bar" style="width:300px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" placeholder="Search by name or phone…" id="cust-search" oninput="filterCustomers(this.value)" />
+      </div>
+      <span style="font-size:13px;color:var(--muted)">${state.customers.length} total</span>
+    </div>
+    ${state.customers.length ? `
+    <div class="table-wrap" id="cust-table-wrap"><table id="cust-table">
+      <thead><tr><th>Customer</th><th>Card</th><th>Wallet</th><th>Stamps</th><th>Joined</th><th>Actions</th></tr></thead>
+      <tbody id="cust-tbody">${renderCustomerRows(state.customers, colors)}</tbody>
+    </table></div>` : emptyState('👥','No customers yet','Customers appear here after registering via your card link.')}
+  </div>`
+}
+
+function renderCustomerRows(list, colors=['avatar-green','avatar-blue','avatar-amber','avatar-pink']) {
+  if (!list.length) return `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px">No customers match your search.</td></tr>`
+  return list.map((c,i) => {
+    const stamps = c.stamp_count || c.stamps || 0
+    const goal   = c.goal_stamps || 10
+    const pct    = Math.min(100, Math.round(stamps / goal * 100))
+    const cardName = c.card_name || c.loyalty_cards?.name || '—'
+    const joined = c.created_at ? new Date(c.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—'
+    return `<tr>
+      <td><div class="td-name-cell"><div class="avatar ${colors[i%4]}">${initials(c.name)}</div><div class="td-name-inner"><div class="name">${esc(c.name)}</div><div class="sub">${esc(c.phone||'—')}</div></div></div></td>
+      <td class="td-muted">${esc(cardName)}</td>
+      <td>${walletPill(c.wallet_type)}</td>
+      <td style="min-width:120px"><div class="prog-wrap"><div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div><span class="prog-label">${stamps}/${goal}</span></div></td>
+      <td class="td-muted">${joined}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="sendPushTo('${c.id}','${esc(c.name)}')">📢</button></td>
+    </tr>`
+  }).join('')
+}
+
+function filterCustomers(q) {
+  const lq = q.toLowerCase().trim()
+  const filtered = lq ? state.customers.filter(c => c.name?.toLowerCase().includes(lq) || c.phone?.includes(lq)) : state.customers
+  const tbody = document.getElementById('cust-tbody')
+  if (tbody) tbody.innerHTML = renderCustomerRows(filtered)
+}
+
+async function sendPushTo(customerId, name) {
+  const msg = prompt(`Send a message to ${name}:`)
+  if (!msg) return
+  try {
+    const res = await authFetch('/api/push/broadcast', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ message: msg, customer_ids: [customerId] })
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error)
+    showToast(`Message sent to ${name}`, 'ok')
+  } catch(ex) { showToast(ex.message || 'Failed to send', 'err') }
+}
+
+// ─────────────────────────────────────────────────────────
+// Page: Push Notify
+// ─────────────────────────────────────────────────────────
+function renderPush() {
+  const templates = [
+    ['☕ Double stamps today!', 'Double stamps all day — come visit us!'],
+    ['🎉 Special offer', 'Special weekend offer just for our loyal customers!'],
+    ['📍 We\'re open', 'We\'re open today! Stop by and collect your stamps.'],
+    ['🎁 Reward reminder', 'You\'re almost at your free reward — just a few more stamps!'],
+  ]
+  const colors = ['avatar-green','avatar-blue','avatar-amber','avatar-pink']
+
+  return `<div class="push-layout">
+  <div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-title" style="margin-bottom:16px">Quick Templates</div>
+      <div class="template-grid">${templates.map(([l,m]) => `<button class="template-btn" onclick="useTemplate(${JSON.stringify(m)})">${l}</button>`).join('')}</div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-title" style="margin-bottom:14px">Target Audience</div>
+      <div class="tab-row">
+        <button class="tab active" data-push-mode="all" onclick="setPushMode('all',this)">All Customers</button>
+        <button class="tab" data-push-mode="select" onclick="setPushMode('select',this)">By Customer</button>
+      </div>
+      <div id="push-customer-panel" style="display:none">
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button class="btn btn-ghost btn-sm" onclick="pushSelectAll()">Select all</button>
+          <button class="btn btn-ghost btn-sm" onclick="pushDeselectAll()">Deselect all</button>
+          <span style="font-size:12px;color:var(--muted);margin-left:auto" id="push-sel-count">0 selected</span>
+        </div>
+        <div class="cbox-list" id="push-cbox-list">
+          ${state.customers.map((c,i) => `
+          <label class="cbox-item" data-cid="${c.id}">
+            <input type="checkbox" class="push-cbox" value="${c.id}" onchange="updatePushCount()"/>
+            <div class="avatar ${colors[i%4]}" style="width:28px;height:28px;font-size:11px">${initials(c.name)}</div>
+            <div style="flex:1"><div style="font-size:13px;font-weight:500">${esc(c.name)}</div><div style="font-size:11px;color:var(--muted)">${esc(c.phone||'—')}</div></div>
+            ${walletPill(c.wallet_type)}
+          </label>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="margin-bottom:14px">Message</div>
+      <div class="field" style="margin-bottom:4px">
+        <label>Notification Text <span style="font-weight:400;text-transform:none;font-size:12px">(max 140 chars)</span></label>
+        <textarea id="push-msg" maxlength="140" placeholder="e.g. Double stamps today — come visit us!" oninput="onPushMsgInput(this)" rows="3"></textarea>
+      </div>
+      <div class="char-row"><span id="push-send-info">Sends to all ${state.customers.length} customers</span><span id="push-char">0 / 140</span></div>
+      <div style="margin-top:16px">
+        <button class="btn btn-primary" id="push-send-btn" onclick="doBroadcast()" style="min-width:140px">
+          <span id="push-send-label">Send Now</span>
+        </button>
+      </div>
+      <div class="result-box" id="push-result"></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card" style="position:sticky;top:80px">
+      <div class="card-title" style="margin-bottom:16px">Preview</div>
+      <div class="phone-stack">
+        <div>
+          <div class="phone">
+            <div class="phone-header"><div class="phone-dot"></div></div>
+            <div class="phone-screen" style="background:#121212">
+              <div class="phone-notif" style="background:#1E1E1E">
+                <div class="phone-notif-head">
+                  <div class="phone-notif-icon">N</div>
+                  <span class="phone-notif-app" style="color:#aaa">Nook</span>
+                  <span class="phone-notif-time" style="color:#666">now</span>
+                </div>
+                <div class="phone-notif-title" style="color:#fff" id="preview-title-and">${esc(business?.name||'Nook')}</div>
+                <div class="phone-notif-body" style="color:#aaa" id="preview-body-and">Your message preview appears here</div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-label">Android</div>
+        </div>
+        <div>
+          <div class="phone" style="background:#fff">
+            <div class="ios-status"><span>9:41</span><span>●●●</span></div>
+            <div class="phone-screen">
+              <div class="phone-notif">
+                <div class="phone-notif-head">
+                  <div class="phone-notif-icon">N</div>
+                  <span class="phone-notif-app">Nook</span>
+                  <span class="phone-notif-time">now</span>
+                </div>
+                <div class="phone-notif-title" id="preview-title-ios">${esc(business?.name||'Nook')}</div>
+                <div class="phone-notif-body" id="preview-body-ios">Your message preview appears here</div>
+              </div>
+            </div>
+          </div>
+          <div class="phone-label">iPhone</div>
+        </div>
+      </div>
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600">REACHES</div>
+        <div style="font-size:13px;margin-bottom:4px">📱 <b>${state.customers.filter(c=>c.wallet_type==='google').length}</b> Google Wallet cards</div>
+        <div style="font-size:13px">🔔 <b>${state.customers.filter(c=>c.device_token).length}</b> web push subscribers</div>
+      </div>
+    </div>
+  </div>
+  </div>`
+}
+
+let pushMode = 'all'
+function setPushMode(m, btn) {
+  pushMode = m
+  document.querySelectorAll('[data-push-mode]').forEach(b => b.classList.toggle('active', b === btn))
+  document.getElementById('push-customer-panel').style.display = m === 'select' ? 'block' : 'none'
+  updatePushSendInfo()
+}
+function useTemplate(msg) {
+  const ta = document.getElementById('push-msg')
+  if (ta) { ta.value = msg; onPushMsgInput(ta) }
+}
+function onPushMsgInput(ta) {
+  const len = ta.value.length
+  const cc  = document.getElementById('push-char')
+  if (cc) { cc.textContent = `${len} / 140`; cc.className = len > 120 ? (len===140?'char-over':'char-warn') : '' }
+  const body = ta.value.trim() || 'Your message preview appears here'
+  const els  = ['preview-body-and','preview-body-ios']
+  els.forEach(id => { const el = document.getElementById(id); if(el) el.textContent = body })
+  updatePushSendInfo()
+}
+function updatePushCount() {
+  const sel = document.querySelectorAll('.push-cbox:checked').length
+  const el  = document.getElementById('push-sel-count')
+  if (el) el.textContent = `${sel} selected`
+  updatePushSendInfo()
+}
+function updatePushSendInfo() {
+  const el = document.getElementById('push-send-info')
+  if (!el) return
+  if (pushMode === 'all') el.textContent = `Sends to all ${state.customers.length} customers`
+  else {
+    const sel = document.querySelectorAll('.push-cbox:checked').length
+    el.textContent = sel ? `Sends to ${sel} selected customer${sel!==1?'s':''}` : 'Select customers above'
+  }
+}
+function pushSelectAll()   { document.querySelectorAll('.push-cbox').forEach(c=>c.checked=true);  updatePushCount() }
+function pushDeselectAll() { document.querySelectorAll('.push-cbox').forEach(c=>c.checked=false); updatePushCount() }
+
+async function doBroadcast() {
+  const msg = document.getElementById('push-msg')?.value.trim()
+  if (!msg) { showToast('Enter a message first', 'err'); return }
+  if (pushMode === 'select' && !document.querySelectorAll('.push-cbox:checked').length) {
+    showToast('Select at least one customer', 'err'); return
+  }
+  const btn   = document.getElementById('push-send-btn')
+  const label = document.getElementById('push-send-label')
+  btn.disabled = true; label.innerHTML = '<div class="spin"></div>'
+  const body = { message: msg }
+  if (pushMode === 'select') body.customer_ids = [...document.querySelectorAll('.push-cbox:checked')].map(c=>c.value)
+  try {
+    const res  = await authFetch('/api/push/broadcast', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Failed')
+    const rb = document.getElementById('push-result')
+    rb.className = 'result-box ok'; rb.style.display = 'block'
+    rb.innerHTML = `<div class="result-row"><span>Total customers</span><b>${data.total_customers??0}</b></div><div class="result-row"><span>Web push sent</span><b>${data.web_push_sent??0}</b></div><div class="result-row"><span>Wallet updated</span><b>${data.wallet_updated??0}</b></div>${data.failed?`<div class="result-row"><span>Failed</span><b>${data.failed}</b></div>`:''}`
+    showToast(`Sent! ${data.wallet_updated} wallet${data.wallet_updated!==1?'s':''} updated`, 'ok')
+    document.getElementById('push-msg').value = ''
+    onPushMsgInput(document.getElementById('push-msg'))
+  } catch(ex) {
+    const rb = document.getElementById('push-result')
+    rb.className = 'result-box err'; rb.style.display = 'block'; rb.textContent = ex.message
+    showToast(ex.message, 'err')
+  }
+  finally { btn.disabled = false; label.textContent = 'Send Now' }
+}
+
+// ─────────────────────────────────────────────────────────
+// Page: Analytics
+// ─────────────────────────────────────────────────────────
+function renderAnalytics() {
+  const googleW = state.customers.filter(c => c.wallet_type === 'google').length
+  const noW     = state.customers.length - googleW
+  const totalC  = state.customers.length
+
+  // Simulated stamp data (30 days)
+  const seed = totalC || 5
+  const lineData = Array.from({length:30}, (_,i) => Math.max(0, Math.round(seed * (0.5 + Math.sin(i/4)*0.3 + Math.random()*0.4))))
+  const dayData  = [3,5,8,6,9,4,2].map(v => Math.round(v * (seed/5 + .5)))
+  const days     = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+
+  return `
+  <div class="range-tabs" id="range-tabs">
+    <button class="range-tab active" onclick="setRange(this,'7d')">7 days</button>
+    <button class="range-tab" onclick="setRange(this,'30d')">30 days</button>
+    <button class="range-tab" onclick="setRange(this,'90d')">90 days</button>
+  </div>
+
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-header"><div><div class="card-title">Stamp Activity</div><div class="card-sub">Stamps collected over time</div></div></div>
+    <div class="chart-area">${lineChart(lineData, 680, 160, '#1D9E75')}</div>
+    <div class="chart-labels"><span>30 days ago</span><span>15 days ago</span><span>Today</span></div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Activity by Day</div></div>
+      <div class="chart-area">${barChart(days, dayData, '#3B82F6', 340, 140)}</div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Wallet Distribution</div></div>
+      <div class="donut-wrap" style="margin-top:12px">
+        ${donutChart([googleW||1, noW||1], ['#1D9E75','#E5E7EB'], 120)}
+        <div class="donut-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#1D9E75"></div><div><div style="font-weight:600;font-size:13px">${googleW}</div><div style="font-size:11px;color:var(--muted)">Google Wallet</div></div></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#E5E7EB"></div><div><div style="font-weight:600;font-size:13px">${noW}</div><div style="font-size:11px;color:var(--muted)">No Wallet</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><div class="card-title">Card Performance</div><div class="card-sub">Customers enrolled per card</div></div>
+    ${state.cards.length ? state.cards.map(c => {
+      const count = Array.isArray(c.customers) ? (c.customers[0]?.count||0) : 0
+      const maxC  = Math.max(...state.cards.map(x => Array.isArray(x.customers)?(x.customers[0]?.count||0):0), 1)
+      const pct   = Math.round(count/maxC*100)
+      return `<div class="perf-row"><div class="perf-name">${esc(c.name)}</div><div class="perf-bar"><div class="perf-fill" style="width:${pct}%;background:${c.color||'#1D9E75'}"></div></div><div class="perf-val">${count}</div></div>`
+    }).join('') : `<div style="color:var(--muted);text-align:center;padding:20px;font-size:13px">No cards yet</div>`}
+  </div>`
+}
+
+function setRange(btn) {
+  document.querySelectorAll('.range-tab').forEach(b => b.classList.toggle('active', b===btn))
+}
+
+// SVG Charts
+function lineChart(data, w, h, color) {
+  const max = Math.max(...data, 1)
+  const pts = data.map((v,i) => `${(i/(data.length-1))*w},${h-(v/max)*h}`)
+  const fill= `M 0,${h} L ${pts.join(' L ')} L ${w},${h} Z`
+  const id  = 'lg' + Math.random().toString(36).slice(2)
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:${h}px;display:block;overflow:visible">
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity=".25"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+    <path d="${fill}" fill="url(#${id})"/>
+    <polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`
+}
+
+function barChart(labels, data, color, w, h) {
+  const max   = Math.max(...data, 1)
+  const bw    = w / data.length
+  const barW  = bw * 0.55
+  const maxV  = Math.max(...data)
+  const bars  = data.map((v,i) => {
+    const bh = (v/max)*(h-22)
+    const x  = i*bw + (bw-barW)/2
+    const y  = h-bh-18
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="4" fill="${color}" fill-opacity="${v===maxV?'1':'0.4'}"/>`
+  })
+  const xlbls = labels.map((l,i) => `<text x="${(i*bw+bw/2).toFixed(1)}" y="${h-2}" text-anchor="middle" font-size="10" fill="#9CA3AF" font-family="Inter,sans-serif">${l}</text>`)
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;max-height:${h}px;overflow:visible">${bars.join('')}${xlbls.join('')}</svg>`
+}
+
+function donutChart(values, colors, size) {
+  const total = values.reduce((a,b)=>a+b,0)||1
+  const r     = (size-20)/2
+  const cx    = size/2, cy = size/2
+  const circ  = 2*Math.PI*r
+  let offset  = 0
+  const circles = values.map((v,i) => {
+    const pct   = v/total
+    const da    = `${(pct*circ).toFixed(2)} ${circ.toFixed(2)}`
+    const rot   = offset*360-90
+    offset += pct
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${colors[i]}" stroke-width="18" stroke-dasharray="${da}" transform="rotate(${rot} ${cx} ${cy})" stroke-linecap="butt"/>`
+  })
+  const total_label = `<text x="${cx}" y="${cy+4}" text-anchor="middle" font-size="18" font-weight="700" fill="#1A1D23" font-family="Inter,sans-serif">${values[0]}</text>`
+  return `<svg viewBox="0 0 ${size} ${size}" style="width:${size}px;height:${size}px;flex-shrink:0"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#F3F4F6" stroke-width="18"/>${circles.join('')}${total_label}</svg>`
+}
+
+// ─────────────────────────────────────────────────────────
+// Page: Settings
+// ─────────────────────────────────────────────────────────
+function renderSettings() {
+  return `
+  <div class="plan-card">
+    <div class="plan-name">${capitalize(business?.plan||'Starter')} Plan</div>
+    <div class="plan-detail">All features included · Upgrade coming soon</div>
+  </div>
+
+  <div class="two-col">
+    <div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:18px">Account Info</div>
+        <div class="field"><label>Business Name</label><input type="text" value="${esc(business?.name||'')}" readonly style="background:var(--bg);cursor:default"/></div>
+        <div class="field"><label>Email</label><input type="email" value="${esc(business?.owner_email||business?.email||'')}" readonly style="background:var(--bg);cursor:default"/></div>
+        <div class="field"><label>Business ID</label><input type="text" value="${esc(business?.id||'')}" readonly style="background:var(--bg);cursor:default;font-size:12px;font-family:monospace"/></div>
+        <button class="btn btn-outline btn-sm" onclick="showToast('Password reset coming soon','ok')">Change Password</button>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-title" style="margin-bottom:4px">Notification Preferences</div>
+        <div class="card-sub" style="margin-bottom:16px">Control when you receive alerts</div>
+        ${toggle('notif-stamp','Stamp Alert','Notify when a customer scans',true)}
+        ${toggle('notif-redeem','Redemption Alert','Notify when a reward is redeemed',true)}
+        ${toggle('notif-digest','Daily Digest','Summary email each morning',false)}
+        ${toggle('notif-newcust','New Customer','Alert on new customer registration',true)}
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:4px">Integrations</div>
+        <div class="card-sub" style="margin-bottom:16px">Connected services</div>
+        ${integration('🟢','Google Wallet','Pass creation & stamp sync','Connected','pill-green')}
+        ${integration('⚫','Apple Wallet','Requires Apple Developer account','Not connected','pill-gray')}
+        ${integration('🔔','Web Push (VAPID)','Browser push notifications','Active','pill-green')}
+        ${integration('💳','Stripe','Subscription billing','Coming soon','pill-amber')}
+      </div>
+    </div>
+  </div>`
+}
+
+function toggle(id, label, desc, checked) {
+  return `<div class="toggle-row">
+    <div><div class="toggle-label">${label}</div><div class="toggle-desc">${desc}</div></div>
+    <label class="toggle"><input type="checkbox" ${checked?'checked':''}/><span class="toggle-slider"></span></label>
+  </div>`
+}
+
+function integration(icon, name, desc, status, pillClass) {
+  return `<div class="integration-row">
+    <div class="integration-info">
+      <div class="integration-icon" style="background:var(--bg)">${icon}</div>
+      <div><div class="integration-name">${name}</div><div class="integration-desc">${desc}</div></div>
+    </div>
+    <span class="pill ${pillClass}">${status}</span>
+  </div>`
+}
+
+// ─────────────────────────────────────────────────────────
+// Card modal
+// ─────────────────────────────────────────────────────────
+function openModal() {
+  const cr = document.getElementById('color-row')
+  if (cr && !cr.children.length) {
+    cr.innerHTML = COLORS.map(c => `<div class="color-swatch-btn ${c===selectedColor?'sel':''}" style="background:${c}" onclick="selectColor('${c}',this)"></div>`).join('')
+  }
+  document.getElementById('modal').style.display = 'flex'
+}
+function closeModal() { document.getElementById('modal').style.display = 'none' }
+function selectColor(c, el) {
+  selectedColor = c
+  document.querySelectorAll('.color-swatch-btn').forEach(b => b.classList.toggle('sel', b===el))
+}
+async function submitCard() {
+  const name = document.getElementById('m-name').value.trim()
+  if (!name) { showToast('Enter a card name', 'err'); return }
+  const btn = document.getElementById('create-card-btn')
+  btn.disabled = true; btn.innerHTML = '<div class="spin"></div>'
+  try {
+    const res = await authFetch('/api/cards', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        name, card_type: document.getElementById('m-type').value,
+        goal_stamps: parseInt(document.getElementById('m-stamps').value)||10,
+        reward_desc: document.getElementById('m-reward').value.trim(),
+        color: selectedColor
       })
     })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Failed')
+    await reloadCards()
+    closeModal()
+    navigate('cards')
+    showToast('Card created!', 'ok')
+  } catch(ex) { showToast(ex.message, 'err') }
+  finally { btn.disabled = false; btn.textContent = 'Create Card' }
+}
 
-    box.querySelectorAll('.customer-item').forEach(item => {
-      item.addEventListener('click', e => {
-        if (e.target.tagName === 'INPUT') return
-        const cb = item.querySelector('input')
-        cb.checked = !cb.checked
-        cb.dispatchEvent(new Event('change'))
-      })
-    })
+// ─────────────────────────────────────────────────────────
+// After render hooks
+// ─────────────────────────────────────────────────────────
+function afterRender(page) {
+  if (page === 'customers') document.getElementById('topbar-sub').textContent = `${state.customers.length} registered card holders`
+}
 
-    updateSelCount()
-  }
+// ─────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────
+function authFetch(path, opts={}) {
+  return fetch(`${API}${path}`, { ...opts, headers: { ...opts.headers, Authorization: `Bearer ${token}` } })
+}
 
-  function updateSelCount() {
-    document.getElementById('selected-count').textContent =
-      `${selected.size} selected`
-  }
+function esc(s) {
+  return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+}
 
-  // ── Search ─────────────────────────────────────────────
-  document.getElementById('customer-search').addEventListener('input', e => {
-    searchQ = e.target.value.toLowerCase().trim()
-    renderList()
-  })
+let toastTimer
+function showToast(msg, type='') {
+  const t = document.getElementById('toast')
+  clearTimeout(toastTimer)
+  t.textContent = msg; t.className = `show ${type}`
+  toastTimer = setTimeout(()=>{ t.className = '' }, 3400)
+}
 
-  // ── Select / Deselect all ──────────────────────────────
-  document.getElementById('select-all-btn').addEventListener('click', () => {
-    customers
-      .filter(c => !searchQ || c.name?.toLowerCase().includes(searchQ) || c.phone?.includes(searchQ))
-      .forEach(c => selected.add(c.id))
-    renderList()
-    updateSendInfo()
-  })
-  document.getElementById('deselect-all-btn').addEventListener('click', () => {
-    selected.clear()
-    renderList()
-    updateSendInfo()
-  })
+function initials(name='') {
+  return name.trim().split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2)||'?'
+}
+function capitalize(s='') { return s.charAt(0).toUpperCase()+s.slice(1) }
 
-  // ── Mode tabs ──────────────────────────────────────────
-  document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
-      tab.classList.add('active')
-      mode = tab.dataset.mode
-      document.getElementById('customer-panel').style.display =
-        mode === 'customers' ? 'block' : 'none'
-      selected.clear()
-      renderList()
-      updateSendInfo()
-    })
-  })
+function emptyState(icon, h, p) {
+  return `<div class="empty-state"><div class="empty-state-icon">${icon}</div><h3>${h}</h3><p>${p}</p></div>`
+}
 
-  // ── Char counter ───────────────────────────────────────
-  document.getElementById('message').addEventListener('input', e => {
-    const len = e.target.value.length
-    const el  = document.getElementById('char-count')
-    el.textContent = `${len} / 140`
-    el.className = len > 120 ? (len === 140 ? 'over' : 'warn') : ''
-  })
+function walletPill(type) {
+  if (type==='google') return '<span class="pill pill-green">Google Wallet</span>'
+  if (type==='apple')  return '<span class="pill pill-blue">Apple Wallet</span>'
+  return '<span class="pill pill-gray">No Wallet</span>'
+}
 
-  // ── Send info label ────────────────────────────────────
-  function updateSendInfo() {
-    const el = document.getElementById('send-info')
-    if (mode === 'all') {
-      el.textContent = `Sends to all ${customers.length} customer${customers.length !== 1 ? 's' : ''}`
-    } else {
-      el.textContent = selected.size
-        ? `Sends to ${selected.size} selected customer${selected.size !== 1 ? 's' : ''}`
-        : 'Select customers above'
-    }
-  }
+function typePill(type, inline=false) {
+  const map = { stamp:'pill-green', cashback:'pill-blue', coupon:'pill-amber', membership:'pill-pink' }
+  const cls = map[type]||'pill-gray'
+  const label = type ? type.charAt(0).toUpperCase()+type.slice(1) : '—'
+  return inline ? `<span style="font-size:11px;font-weight:600;color:inherit">${label}</span>` : `<span class="pill ${cls}">${label}</span>`
+}
 
-  // ── Send ───────────────────────────────────────────────
-  document.getElementById('send-btn').addEventListener('click', async () => {
-    const msgEl = document.getElementById('message')
-    const msg   = msgEl.value.trim()
-
-    // Validate
-    msgEl.classList.remove('error')
-    if (!msg) {
-      msgEl.classList.add('error')
-      msgEl.focus()
-      showToast('Please enter a message.', 'error')
-      return
-    }
-    if (mode === 'customers' && selected.size === 0) {
-      showToast('Please select at least one customer.', 'error')
-      return
-    }
-
-    const btn   = document.getElementById('send-btn')
-    const label = document.getElementById('send-label')
-    btn.disabled = true
-    label.innerHTML = '<div class="spinner"></div>'
-
-    const body = { message: msg }
-    if (mode === 'customers') body.customer_ids = [...selected]
-
-    try {
-      const res  = await authFetch('/api/push/broadcast', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      })
-      const data = await res.json()
-
-      if (!res.ok) throw new Error(data.error || 'Broadcast failed')
-
-      showResult(data, true)
-      showToast(`Sent! ${data.wallet_updated} wallet${data.wallet_updated !== 1 ? 's' : ''} updated.`, 'success')
-      msgEl.value = ''
-      document.getElementById('char-count').textContent = '0 / 140'
-      document.getElementById('char-count').className = ''
-    } catch (ex) {
-      showResult({ error: ex.message }, false)
-      showToast(ex.message || 'Broadcast failed.', 'error')
-    } finally {
-      btn.disabled = false
-      label.textContent = 'Send'
-    }
-  })
-
-  // ── Result box ─────────────────────────────────────────
-  function showResult(data, ok) {
-    const box = document.getElementById('result-box')
-    box.className = ok ? 'success' : 'error'
-    box.style.display = 'block'
-
-    if (!ok) {
-      box.textContent = data.error || 'An error occurred.'
-      return
-    }
-
-    box.innerHTML = `
-      <div class="result-row">
-        <span class="result-label">Total customers</span>
-        <span>${data.total_customers ?? '—'}</span>
-      </div>
-      <div class="result-row">
-        <span class="result-label">Web push sent</span>
-        <span>${data.web_push_sent ?? 0}</span>
-      </div>
-      <div class="result-row">
-        <span class="result-label">Google Wallet updated</span>
-        <span>${data.wallet_updated ?? 0}</span>
-      </div>
-      ${data.failed ? `<div class="result-row"><span class="result-label">Failed</span><span>${data.failed}</span></div>` : ''}
-    `
-  }
-
-  // ── Toast ──────────────────────────────────────────────
-  let toastTimer
-  function showToast(msg, type = '') {
-    const t = document.getElementById('toast')
-    clearTimeout(toastTimer)
-    t.textContent = msg
-    t.className = `show ${type}`
-    toastTimer = setTimeout(() => { t.className = '' }, 3200)
-  }
-
-  // ── Auth fetch helper ──────────────────────────────────
-  function authFetch(path, opts = {}) {
-    return fetch(`${API}${path}`, {
-      ...opts,
-      headers: { ...opts.headers, Authorization: `Bearer ${token}` }
-    })
-  }
-
-  // ── Escape HTML ────────────────────────────────────────
-  function esc(str) {
-    return String(str ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-  }
+function cardIcon(type) {
+  const map = { stamp:'★', cashback:'%', coupon:'🎟', membership:'♦' }
+  return map[type]||'★'
+}
 </script>
 </body>
 </html>
