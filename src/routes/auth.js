@@ -79,6 +79,81 @@ router.post('/login', async (req, res) => {
   }
 })
 
+// ─── POST /api/auth/google ─────────────────────────────────────
+// Google OAuth login / auto-register
+router.post('/google', async (req, res) => {
+  try {
+    const { id_token } = req.body
+    if (!id_token) return res.status(400).json({ error: 'id_token required' })
+
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return res.status(503).json({ error: 'Google OAuth not configured on server' })
+    }
+
+    const { OAuth2Client } = require('google-auth-library')
+    const gclient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+
+    let payload
+    try {
+      const ticket = await gclient.verifyIdToken({
+        idToken: id_token,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      })
+      payload = ticket.getPayload()
+    } catch {
+      return res.status(401).json({ error: 'Invalid Google token' })
+    }
+
+    const { email, name, picture, sub: google_id } = payload
+
+    // Find existing business by email
+    const { data: existing } = await supabase
+      .from('businesses')
+      .select('id, name, owner_email, plan')
+      .eq('owner_email', email)
+      .single()
+
+    let biz = existing
+
+    if (!biz) {
+      // Auto-create business account for new Google users
+      const { data, error } = await supabase
+        .from('businesses')
+        .insert({
+          name: name || email.split('@')[0],
+          owner_email: email,
+          password_hash: '',
+          google_id,
+          logo_url: picture,
+          auth_provider: 'google',
+        })
+        .select('id, name, owner_email, plan')
+        .single()
+
+      if (error) throw error
+      biz = data
+    } else {
+      // Keep Google metadata current (non-blocking)
+      supabase
+        .from('businesses')
+        .update({ google_id, logo_url: picture, auth_provider: 'google' })
+        .eq('id', biz.id)
+        .then(() => {})
+    }
+
+    const token = jwt.sign(
+      { id: biz.id, email: biz.owner_email, name: biz.name, plan: biz.plan },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN }
+    )
+
+    res.json({ token, business: biz })
+  } catch (err) {
+    console.error('Google auth error:', err)
+    res.status(500).json({ error: 'Google authentication failed' })
+  }
+})
+
 // ─── POST /api/auth/scanner-token ────────────────────────────
 // 직원용 스캐너 전용 토큰 발급 (30일 유효)
 router.post('/scanner-token', require('../middleware/auth').authMiddleware, async (req, res) => {
