@@ -264,7 +264,7 @@ card_id:     57ef9f1c-ae5f-4df0-94f6-ad77252bd742
 
 ---
 
-## 14. Current Status (2026-05)
+## 14. Current Status (2026-05-02)
 
 ### Deployed & Working
 - **Backend API** — `https://nook-production-270f.up.railway.app` (Railway, auto-deploys on push)
@@ -280,6 +280,15 @@ card_id:     57ef9f1c-ae5f-4df0-94f6-ad77252bd742
 - Apple Wallet not implemented (requires Apple Developer account)
 - No customer-facing registration page connected to production
 - No Stripe billing — all accounts manually created
+
+### 2026-05-02 — Today's Fixes
+- **Fixed `/auth` 404 on Railway** — Root cause: Next.js 16 deprecated `middleware.ts` export name. Migrated auth guard logic to `proxy.ts` (`export function proxy`). Kept `middleware.ts` as a no-op stub with empty matcher to satisfy Turbopack build.
+- **Fixed nixpacks.toml** — Added `cp -r public` and `cp -r .next/static` into standalone output; set `HOSTNAME=0.0.0.0` in start command so Railway can bind.
+- **Fixed "Failed to fetch" on login** — Two causes resolved:
+  1. `NEXT_PUBLIC_API_URL` was missing from Railway Variables → added `https://nook-production-270f.up.railway.app`
+  2. CORS was not allowing `.railway.app` → added `/\.railway\.app$/` to backend `cors()` origins in `src/index.js`
+- **Admin dashboard login now fully working** at `https://nook-admin-production.up.railway.app/auth`
+- **CLAUDE.md updated** with sections 14–19 (current status, todo, features, pricing, credentials, architecture)
 
 ---
 
