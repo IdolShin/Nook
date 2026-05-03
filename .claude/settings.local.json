@@ -43,7 +43,12 @@
       "Bash(gh auth *)",
       "Bash(git --version)",
       "Bash(git config *)",
-      "Bash(git init *)"
+      "Bash(git init *)",
+      "Bash(git commit *)",
+      "Bash(npx tsc *)",
+      "Bash(git pull *)",
+      "Bash(npx next *)",
+      "Bash(xargs grep *)"
     ]
   }
 }

@@ -11,6 +11,8 @@ const scanRoutes     = require('./routes/scan')
 const couponRoutes   = require('./routes/coupons')
 const { router: pushRoutes } = require('./services/push')
 const walletRoutes   = require('./routes/wallet')
+const statsRoutes    = require('./routes/stats')
+const permissionsRoutes = require('./routes/permissions')
 const schedule       = require('node-schedule')
 
 const app = express()
@@ -53,6 +55,8 @@ app.use('/api/scan',      scanLimiter, scanRoutes)
 app.use('/api/coupons',   couponRoutes)
 app.use('/api/push',      pushRoutes)
 app.use('/api/wallet',    walletRoutes)
+app.use('/api/stats',       statsRoutes)
+app.use('/api/permissions', permissionsRoutes)
 
 // Health check
 app.get('/health', (req, res) => {
@@ -140,8 +144,4 @@ schedule.scheduleJob('0 9 * * *', async () => {
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
   console.log(`\n🟢 Nook backend running on port ${PORT}`)
-  console.log(`   Health: http://localhost:${PORT}/health`)
-  console.log(`   Mode:   ${process.env.NODE_ENV || 'development'}\n`)
-})
-
-module.exports = app
+  console.log(`   Health: http://localhost:${

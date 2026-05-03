@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="48" viewBox="0 0 180 48" fill="none">
+
+<rect x="0" y="8" width="32" height="32" rx="8" fill="white"></rect>
+<path d="M9 30 L9 22.5 C9 19.46 11.46 17 14.5 17 L17.5 17 C20.54 17 23 19.46 23 22.5 L23 30" transform="translate(0 0)" stroke="#1A1A1F" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path>
+<circle cx="23" cy="17.5" r="2" fill="#1A1A1F"></circle>
+<text x="44" y="32" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="22" font-weight="700" fill="white" letter-spacing="-0.02em">Nook</text>
+</svg>

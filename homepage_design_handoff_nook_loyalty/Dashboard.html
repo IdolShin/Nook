@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Nook · Admin Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #F5F6FA;
+    --surface: #FFFFFF;
+    --border: #EBEBEB;
+    --border-soft: #F0F0F2;
+    --text: #1A1A1F;
+    --text-2: #5C5F66;
+    --text-3: #8A8D94;
+    --accent: #1D9E75;
+    --accent-light: #E8F7F2;
+    --accent-dark: #085041;
+    --radius: 13px;
+    --radius-sm: 8px;
+    --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04);
+    --grad-green: linear-gradient(135deg, #DFF4EB 0%, #C7EBDB 100%);
+    --grad-blue:  linear-gradient(135deg, #E2ECFB 0%, #CADCF7 100%);
+    --grad-amber: linear-gradient(135deg, #FBEFD9 0%, #F6E0B5 100%);
+    --grad-pink:  linear-gradient(135deg, #FBE2EC 0%, #F6CCDD 100%);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  button { font-family: inherit; cursor: pointer; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+  /* Layout */
+  .app {
+    display: grid;
+    grid-template-columns: var(--sidebar-w, 240px) 1fr;
+    min-height: 100vh;
+    transition: grid-template-columns 220ms ease;
+  }
+  .app.dense { font-size: 13px; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #DDDEE2; border-radius: 10px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: #C7C9CE; }
+
+  /* Card primitive */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  /* Subtle motion */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fadeup { animation: fadeUp 360ms ease both; }
+  .fadeup-static { opacity: 1; }
+
+  /* Tooltip for charts */
+  .chart-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: #1A1A1F;
+    color: white;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.4;
+    box-shadow: 0 4px 14px rgba(0,0,0,.18);
+    transform: translate(-50%, -120%);
+    white-space: nowrap;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+  .chart-tooltip.show { opacity: 1; }
+  .chart-tooltip .lbl { color: #B8BBC0; font-size: 11px; }
+  .chart-tooltip .val { font-weight: 600; }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 32px; padding: 0 12px;
+    border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text);
+    font-size: 13px; font-weight: 500;
+    transition: background 120ms;
+  }
+  .btn:hover { background: #FAFAFB; }
+  .btn-primary {
+    background: var(--accent); border-color: var(--accent); color: white;
+  }
+  .btn-primary:hover { background: #178862; }
+  .btn-ghost { background: transparent; border-color: transparent; }
+  .btn-ghost:hover { background: #EFF0F3; }
+
+  /* Pills (segmented) */
+  .seg {
+    display: inline-flex;
+    background: #F0F1F4;
+    border-radius: 8px;
+    padding: 3px;
+    gap: 0;
+  }
+  .seg button {
+    border: 0; background: transparent;
+    padding: 5px 10px; font-size: 12px; font-weight: 500;
+    color: var(--text-2); border-radius: 6px;
+    transition: all 120ms;
+  }
+  .seg button.on {
+    background: white;
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* Badges */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 500;
+    background: #F0F1F4; color: var(--text-2);
+  }
+  .badge.green { background: var(--accent-light); color: var(--accent-dark); }
+  .badge.amber { background: #FDF3E0; color: #8C5A11; }
+  .badge.blue { background: #E5EDF8; color: #1F4E94; }
+  .badge.pink { background: #FBE6EE; color: #99355C; }
+
+  /* Section header */
+  h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+  .section-title { font-size: 15px; font-weight: 600; }
+  .muted { color: var(--text-3); }
+  .text-2 { color: var(--text-2); }
+
+  /* Avatars */
+  .avatar {
+    width: 28px; height: 28px;
+    border-radius: 999px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+    color: white; flex: none;
+  }
+
+  /* Util */
+  .row { display: flex; align-items: center; }
+  .between { justify-content: space-between; }
+  .gap-1 { gap: 4px; } .gap-2 { gap: 8px; } .gap-3 { gap: 12px; } .gap-4 { gap: 16px; } .gap-6 { gap: 24px; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React + Babel -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="src/icons.jsx"></script>
+  <script type="text/babel" src="src/data.jsx"></script>
+  <script type="text/babel" src="src/charts.jsx"></script>
+  <script type="text/babel" src="src/sidebar.jsx"></script>
+  <script type="text/babel" src="src/topbar.jsx"></script>
+  <script type="text/babel" src="src/stat-cards.jsx"></script>
+  <script type="text/babel" src="src/panels.jsx"></script>
+  <script type="text/babel" src="src/cards-page.jsx"></script>
+  <script type="text/babel" src="src/customers-page.jsx"></script>
+  <script type="text/babel" src="src/push-page.jsx"></script>
+  <script type="text/babel" src="src/analytics-settings.jsx"></script>
+  <script type="text/babel" src="src/mobile-scanner.jsx"></script>
+  <script type="text/babel" src="src/auth-page.jsx"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="src/app.jsx"></script>
+
+<style id="__om-edit-overrides"></style>
+</body>
+</html>

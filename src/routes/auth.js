@@ -4,8 +4,25 @@ const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const supabase = require('../db/supabase')
 
+const SUPERADMIN_EMAIL = 'woosang930414@gmail.com'
+
+// ─── Helper: build JWT payload with permissions ──────────────
+function buildToken(biz) {
+  return jwt.sign(
+    {
+      id: biz.id,
+      email: biz.owner_email,
+      name: biz.name,
+      plan: biz.plan,
+      is_superadmin: biz.is_superadmin || biz.owner_email === SUPERADMIN_EMAIL || false,
+      page_permissions: biz.page_permissions || null,  // null = full access
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN }
+  )
+}
+
 // ─── POST /api/auth/register ─────────────────────────────────
-// 새 비즈니스 계정 생성
 router.post('/register', async (req, res) => {
   try {
     const { name, email, password, phone, address } = req.body
@@ -13,7 +30,6 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'name, email, password required' })
     }
 
-    // Check duplicate
     const { data: existing } = await supabase
       .from('businesses')
       .select('id')
@@ -27,18 +43,14 @@ router.post('/register', async (req, res) => {
     const { data, error } = await supabase
       .from('businesses')
       .insert({ name, owner_email: email, password_hash, phone, address })
-      .select('id, name, owner_email, plan')
+      .select('id, name, owner_email, plan, is_superadmin, page_permissions')
       .single()
 
     if (error) throw error
 
-    const token = jwt.sign(
-      { id: data.id, email: data.owner_email, name: data.name, plan: data.plan },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
-    )
-
-    res.status(201).json({ token, business: data })
+    const token = buildToken(data)
+    const { password_hash: _, ...safe } = data
+    res.status(201).json({ token, business: safe })
   } catch (err) {
     console.error('Register error:', err)
     res.status(500).json({ error: 'Registration failed' })
@@ -46,7 +58,6 @@ router.post('/register', async (req, res) => {
 })
 
 // ─── POST /api/auth/login ─────────────────────────────────────
-// 로그인
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body
@@ -56,7 +67,7 @@ router.post('/login', async (req, res) => {
 
     const { data: biz, error } = await supabase
       .from('businesses')
-      .select('id, name, owner_email, password_hash, plan')
+      .select('id, name, owner_email, password_hash, plan, is_superadmin, page_permissions')
       .eq('owner_email', email)
       .single()
 
@@ -65,12 +76,7 @@ router.post('/login', async (req, res) => {
     const valid = await bcrypt.compare(password, biz.password_hash)
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' })
 
-    const token = jwt.sign(
-      { id: biz.id, email: biz.owner_email, name: biz.name, plan: biz.plan },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
-    )
-
+    const token = buildToken(biz)
     const { password_hash, ...safe } = biz
     res.json({ token, business: safe })
   } catch (err) {
@@ -80,7 +86,6 @@ router.post('/login', async (req, res) => {
 })
 
 // ─── POST /api/auth/google ─────────────────────────────────────
-// Google OAuth login / auto-register
 router.post('/google', async (req, res) => {
   try {
     const { id_token } = req.body
@@ -106,17 +111,15 @@ router.post('/google', async (req, res) => {
 
     const { email, name, picture, sub: google_id } = payload
 
-    // Find existing business by email
     const { data: existing } = await supabase
       .from('businesses')
-      .select('id, name, owner_email, plan')
+      .select('id, name, owner_email, plan, is_superadmin, page_permissions')
       .eq('owner_email', email)
       .single()
 
     let biz = existing
 
     if (!biz) {
-      // Auto-create business account for new Google users
       const { data, error } = await supabase
         .from('businesses')
         .insert({
@@ -126,8 +129,9 @@ router.post('/google', async (req, res) => {
           google_id,
           logo_url: picture,
           auth_provider: 'google',
+          is_superadmin: email === SUPERADMIN_EMAIL,
         })
-        .select('id, name, owner_email, plan')
+        .select('id, name, owner_email, plan, is_superadmin, page_permissions')
         .single()
 
       if (error) throw error
@@ -141,12 +145,7 @@ router.post('/google', async (req, res) => {
         .then(() => {})
     }
 
-    const token = jwt.sign(
-      { id: biz.id, email: biz.owner_email, name: biz.name, plan: biz.plan },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
-    )
-
+    const token = buildToken(biz)
     res.json({ token, business: biz })
   } catch (err) {
     console.error('Google auth error:', err)
@@ -154,8 +153,38 @@ router.post('/google', async (req, res) => {
   }
 })
 
+// ─── PATCH /api/auth/me ───────────────────────────────────────
+router.patch('/me', require('../middleware/auth').authMiddleware, async (req, res) => {
+  try {
+    const { name, owner_email, phone, address, timezone, region } = req.body
+    const updates = {}
+    if (name)        updates.name = name
+    if (owner_email) updates.owner_email = owner_email
+    if (phone)       updates.phone = phone
+    if (address)     updates.address = address
+    if (timezone)    updates.timezone = timezone
+    if (region)      updates.region = region
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No fields to update' })
+    }
+
+    const { data, error } = await supabase
+      .from('businesses')
+      .update(updates)
+      .eq('id', req.business.id)
+      .select('id, name, owner_email, plan')
+      .single()
+
+    if (error) throw error
+    res.json({ business: data })
+  } catch (err) {
+    console.error('Update profile error:', err)
+    res.status(500).json({ error: 'Failed to update profile' })
+  }
+})
+
 // ─── POST /api/auth/scanner-token ────────────────────────────
-// 직원용 스캐너 전용 토큰 발급 (30일 유효)
 router.post('/scanner-token', require('../middleware/auth').authMiddleware, async (req, res) => {
   const token = jwt.sign(
     { id: req.business.id, name: req.business.name, role: 'scanner' },
