@@ -114,7 +114,8 @@ ID:       06fd310f-7a77-497c-b682-2b668fa17a29
 
 | Table | Purpose |
 |-------|---------|
-| `businesses` | 가게/사장님 계정 — email, password_hash, plan, logo_url |
+| `businesses` | 가게/사장님 계정 — email, password_hash, plan, logo_url, **is_superadmin**, **page_permissions** |
+| `business_users` | 스태프 계정 per business — email, name, role, page_permissions, password_hash |
 | `loyalty_cards` | 로열티 카드 종류 — type, goal_stamps, reward_desc, color, google_class_id |
 | `customers` | 고객 정보 — linked to business + card, phone, qr_code, barcode, wallet_type |
 | `stamps` | 스탬프 적립 기록 — customer_id, card_id, scan_type, scanned_by |
@@ -177,6 +178,17 @@ POST /api/coupons/:id/issue      🔒  { customer_ids }  →  issues passes
 POST /api/coupons/redeem         🔒  { barcode }       →  marks pass as used
 ```
 
+### Permissions (superadmin only)
+```
+GET  /api/permissions/businesses         🔒  →  { businesses }  (all businesses + permissions)
+PATCH /api/permissions/businesses/:id   🔒  { page_permissions }  →  { business }
+GET  /api/permissions/users              🔒  →  { users }  (staff for this business)
+POST /api/permissions/users             🔒  { email, name, role, password, page_permissions? }
+PATCH /api/permissions/users/:id        🔒  { name, role, page_permissions, is_active, password? }
+DELETE /api/permissions/users/:id       🔒  →  { success }
+POST /api/permissions/staff-login       { email, password }  →  { token }  (staff login)
+```
+
 ---
 
 ## Business Model
@@ -205,6 +217,7 @@ POST /api/coupons/redeem         🔒  { barcode }       →  marks pass as used
 - PWA (installable on Android + iPhone)
 - Google OAuth login
 - Railway deployment (both frontend + backend, auto-deploy on git push)
+- **Permissions system** — VIEW/EDIT/ADMIN per page, staff users, superadmin (Woosang)
 
 ---
 
@@ -325,7 +338,22 @@ git push origin main
 
 ## Change Log
 
-### 2026-05-02
+### 2026-05-02 (Session 2 — Permissions System)
+- Built full permissions system: VIEW/EDIT/ADMIN per page per business/staff
+- Backend: `src/routes/permissions.js` — CRUD for businesses + staff users, superadmin guard
+- Backend: `src/routes/auth.js` — JWT now includes `is_superadmin` + `page_permissions`
+- Backend: `src/index.js` — registered `/api/permissions` routes
+- Frontend: `src/lib/permissions.ts` — PermLevel types, helpers (canView/canEdit/canAdmin), decodeToken
+- Frontend: `src/app/(admin)/permissions/page.tsx` — full UI (staff tab + businesses tab)
+- Frontend: `src/components/layout/Sidebar.tsx` — dynamic nav based on page permissions
+- Frontend: `src/app/(admin)/layout.tsx` — route guard, redirects on insufficient permissions
+- Frontend: `src/components/layout/BottomNav.tsx` — filters tabs by permissions
+- Supabase migration done: `businesses` table + `is_superadmin`/`page_permissions` columns, `business_users` table
+- Woosang set as superadmin (is_superadmin = true) via SQL UPDATE
+- Git push via `C:\Users\woosa\Desktop\nook_git_push.bat` (reusable)
+- ⚠️ After Railway deploy: must log out + log back in to get JWT with is_superadmin field
+
+### 2026-05-02 (Session 1 — Railway Deploy Fix)
 - Fixed `/auth` 404 on Railway — Next.js 16 `middleware.ts` → `proxy.ts` migration
 - Fixed nixpacks.toml — standalone static file copy + `HOSTNAME=0.0.0.0`
 - Fixed "Failed to fetch" on login — added `NEXT_PUBLIC_API_URL` to Railway + CORS fix
