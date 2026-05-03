@@ -261,3 +261,151 @@ Test customer registered to the Nook Cafe stamp card:
 customer_id: b1f70cfd-ec99-4b47-9ed2-c387b99d4272
 card_id:     57ef9f1c-ae5f-4df0-94f6-ad77252bd742
 ```
+
+---
+
+## 14. Current Status (2026-05)
+
+### Deployed & Working
+- **Backend API** — `https://nook-production-270f.up.railway.app` (Railway, auto-deploys on push)
+- **Admin dashboard (Next.js)** — `https://nook-admin-production.up.railway.app` (Railway, separate service)
+- **Google login** — working (email/password via `/api/auth/login`, JWT stored as `nook_auth` cookie)
+- **Google Wallet** — working in **demo mode** only (passes visible to test accounts added in Google Pay & Wallet Console)
+- **Coupon system** — DB tables exist (`coupons`, `coupon_passes`), API routes exist, UI not yet built
+- **CORS** — backend allows `*.railway.app`, `*.vercel.app`, `*.nookapp.com`
+- **Next.js 16** — migrated from deprecated `middleware.ts` to `proxy.ts` (routing/auth guard)
+
+### Known Limitations
+- Google Wallet passes only work for whitelisted test emails (not yet production-approved)
+- Apple Wallet not implemented (requires Apple Developer account)
+- No customer-facing registration page connected to production
+- No Stripe billing — all accounts manually created
+
+---
+
+## 15. Todo List — Priority Order
+
+### 🔴 Urgent
+- [ ] **Admin dashboard full UI** — card creation, customer CRM, analytics, settings pages
+- [ ] **Customer registration landing page** — public page: scan QR → fill form → "Add to Wallet"
+- [ ] **Scanner PWA** — staff-facing mobile camera page to scan QR/barcode
+
+### 🟡 Medium
+- [ ] **Coupon system UI** — create coupons, view issued passes, redemption tracking in dashboard
+- [ ] **Stripe integration** — subscription billing (Basic / Pro / Premium plans)
+- [ ] **Business signup page** — public-facing onboarding flow (API exists)
+- [ ] **Apple Wallet** — PassKit implementation (requires $99/yr Apple Developer account)
+- [ ] **Custom domain** — point `nookapp.com` or similar to Railway services
+
+### 🟢 Later
+- [ ] **Analytics page** — stamp volume charts, redemption rates, new customer trends
+- [ ] **Settings page** — logo upload, business profile, plan management
+- [ ] **Multi-language support** — Korean + English UI
+- [ ] **Google Wallet production approval** — submit for review in Google Pay & Wallet Console
+- [ ] **SMS notifications** — Twilio or similar for customers without push subscriptions
+- [ ] **Referral / share feature** — customers share card link to earn bonus stamps
+
+---
+
+## 16. Wanted Features
+
+### Coupon System (planned flow)
+1. Business creates a coupon in the dashboard — sets discount %, expiry days, trigger type
+2. **Trigger types:**
+   - `manual` — business selects customers and issues manually
+   - `winback` — auto-issued to customers with no stamp activity in 30+ days (daily scheduler runs at 9am)
+   - `milestone` — auto-issued when customer reaches N total stamps
+3. Customer receives a **coupon pass** (barcode) via push notification or wallet update
+4. Staff scans coupon barcode at checkout to redeem
+5. Redemption recorded in `coupon_passes` (status: `active` → `used`)
+
+### Scanner PWA (planned)
+- Mobile web app (PWA) for staff
+- Camera opens to scan QR code or barcode
+- Calls `/api/customers/lookup` then `/api/scan`
+- Shows customer name + current stamp count + reward status
+- One-tap stamp or redeem buttons
+- Works offline with cached scanner token (30-day JWT)
+
+### Customer Landing Page (planned)
+- URL: `https://nookapp.com/join/:card_id` (or `/register/:card_id`)
+- Shows business name, card type, reward description
+- Registration form: name + phone + consent checkboxes
+- On submit: registers customer → shows QR + "Add to Google Wallet" button
+- Wallet link generated via `POST /api/wallet/google/create`
+
+---
+
+## 17. Pricing Plans
+
+| Plan | Price | Customers | Cards | Features |
+|------|-------|-----------|-------|---------|
+| Basic | $59/mo | Up to 500 | 1 card | Stamp card, Google Wallet, push notifications |
+| Pro | $79/mo | Up to 2,000 | 3 cards | Everything in Basic + coupon system, analytics |
+| Premium | $119/mo | Unlimited | Unlimited | Everything in Pro + Apple Wallet, priority support, custom domain |
+
+---
+
+## 18. Key Credentials
+
+### Supabase
+- Project ID: `mbidmkovjvrownymlpgg`
+- URL: `https://mbidmkovjvrownymlpgg.supabase.co`
+- Dashboard: `https://supabase.com/dashboard/project/mbidmkovjvrownymlpgg`
+
+### Google Wallet
+- Issuer ID: `3388000000023113032`
+- GCP Project: `nook-494804`
+- Service account: `nook-wallet@nook-494804.iam.gserviceaccount.com`
+- Console: `https://pay.google.com/business/console`
+
+### Railway
+- Backend service: `nook-production` → `https://nook-production-270f.up.railway.app`
+- Admin service: `nook-admin` → `https://nook-admin-production.up.railway.app`
+- Project: `https://railway.com/project/e2355956-a305-4026-b7d3-9e5615bdbca3`
+
+### GitHub
+- Repo (backend): `https://github.com/IdolShin/Nook`
+- Repo (admin): same monorepo, `nook-admin/` subdirectory
+
+---
+
+## 19. Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                        Railway                           │
+│                                                          │
+│  ┌──────────────────────┐  ┌──────────────────────────┐ │
+│  │   nook-backend       │  │   nook-admin (Next.js)   │ │
+│  │   Node.js/Express    │  │   App Router + proxy.ts  │ │
+│  │   :3001              │  │   :3000                  │ │
+│  │                      │  │                          │ │
+│  │  /api/auth           │  │  /auth  (login page)     │ │
+│  │  /api/cards          │  │  /dashboard              │ │
+│  │  /api/customers      │◄─┤  /cards                  │ │
+│  │  /api/scan           │  │  /customers              │ │
+│  │  /api/wallet         │  │  /analytics              │ │
+│  │  /api/push           │  │  /settings               │ │
+│  │  /api/coupons        │  │  /coupons                │ │
+│  │  /dashboard/ (HTML)  │  │  /scanner                │ │
+│  └──────────┬───────────┘  └──────────────────────────┘ │
+└─────────────┼───────────────────────────────────────────┘
+              │
+              ▼
+    ┌──────────────────┐     ┌─────────────────────────┐
+    │   Supabase       │     │   Google Wallet API      │
+    │   (Postgres)     │     │   (service account OAuth)│
+    │   mbidmkovjvr... │     │   Issuer: 338800000...   │
+    └──────────────────┘     └─────────────────────────┘
+
+Data flow:
+  Customer → scans QR → staff scanner → POST /api/scan
+           → stamp saved in DB
+           → Google Wallet pass updated (stamp count)
+           → Web Push sent to customer device
+
+  Business → admin dashboard → POST /api/push/broadcast
+           → Web Push to all customers
+           → Google Wallet lock-screen message updated
+```
