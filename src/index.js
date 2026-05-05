@@ -144,4 +144,5 @@ schedule.scheduleJob('0 9 * * *', async () => {
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
   console.log(`\n🟢 Nook backend running on port ${PORT}`)
-  console.log(`   Health: http://localhost:${
+  console.log(`   Health: http://localhost:${PORT}/health`)
+})
