@@ -338,6 +338,35 @@ git push origin main
 
 ## Change Log
 
+### 2026-05-05 (Session 3 — Scanner Login + Staff Account)
+
+**Scanner account created (direct Supabase REST API insert):**
+- Email: `scanner@nookcafe.com` / Password: `nookcafe2024`
+- Role: `viewer` (Supabase `business_users_role_check` only allows `viewer` and `admin` — NOT `staff`)
+- page_permissions: `{ scanner: 'admin', everything else: 'none' }`
+- business_id: `06fd310f-7a77-497c-b682-2b668fa17a29` (Nook Cafe)
+
+**Root cause of POST /api/permissions/users failure:** Supabase check constraint `business_users_role_check` rejects any role not in `(viewer, admin)`. Was sending `role: 'staff'` in test calls. Fixed API to validate role and return 400 instead of 500.
+
+**New: `/scan-login` page** — dedicated scanner staff login:
+- URL: `https://nook-admin-production.up.railway.app/scan-login?biz=06fd310f-7a77-497c-b682-2b668fa17a29&redirect=/scan`
+- Shows email + password fields; `biz` (business_id) taken from URL param or typed manually
+- Uses `POST /api/permissions/staff-login` (NOT the business owner `/api/auth/login`)
+- Stores JWT as `nook_token` → redirects to `/scan`
+
+**Updated `(staff)/layout.tsx`:** Now redirects unauthenticated users to `/scan-login` instead of `/auth`.
+
+**Added `api.staffLogin(email, password, business_id)`** to `src/lib/api.ts`.
+
+**Commits:**
+- nook-admin `571a7b5`: feat: staff scanner login page + staffLogin API method
+- backend `14e1fd3`: fix: validate role in POST /api/permissions/users (viewer|admin only)
+
+**⚠️ Important notes:**
+- Valid roles in `business_users`: `viewer`, `admin` only (Supabase constraint)
+- Scanner staff should bookmark the scan-login URL with `?biz=<uuid>`
+- `POST /api/scan` and `/api/customers/lookup` both filter by `business_id` from JWT → cross-business isolation enforced at DB level
+
 ### 2026-05-02 (Session 2 — Permissions System)
 - Built full permissions system: VIEW/EDIT/ADMIN per page per business/staff
 - Backend: `src/routes/permissions.js` — CRUD for businesses + staff users, superadmin guard
