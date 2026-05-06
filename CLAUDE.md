@@ -36,8 +36,8 @@ Woosang (operator/admin)
 
 | Layer | Tech |
 |-------|------|
-| Backend | Node.js + Express (`C:\Users\woosa\Desktop\Nook`) |
-| Frontend | Next.js 16 + TypeScript + Tailwind v4 (`C:\Users\woosa\Desktop\Nook\nook-admin`) |
+| Backend | Node.js + Express (`C:\\Users\\woosa\\Desktop\\Nook`) |
+| Frontend | Next.js 16 + TypeScript + Tailwind v4 (`C:\\Users\\woosa\\Desktop\\Nook\\nook-admin`) |
 | Database | Supabase PostgreSQL |
 | Hosting | Railway.app (both services, auto-deploy on git push) |
 | Auth | JWT + Google OAuth |
@@ -178,6 +178,12 @@ POST /api/coupons/:id/issue      🔒  { customer_ids }  →  issues passes
 POST /api/coupons/redeem         🔒  { barcode }       →  marks pass as used
 ```
 
+### Analytics
+```
+GET  /api/analytics              🔒  →  { total_customers, new_customers_30d, stamps_by_day, ... }
+GET  /api/analytics?bizId=xxx    🔒 (superadmin only)  →  same, scoped to another business
+```
+
 ### Permissions (superadmin only)
 ```
 GET  /api/permissions/businesses         🔒  →  { businesses }  (all businesses + permissions)
@@ -218,6 +224,9 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 - Google OAuth login
 - Railway deployment (both frontend + backend, auto-deploy on git push)
 - **Permissions system** — VIEW/EDIT/ADMIN per page, staff users, superadmin (Woosang)
+- **Analytics page** — real DB data, permission guard, superadmin business selector, KPI cards with deltas, day-of-week bar chart
+- **`/api/analytics` route** — new backend route with 30d/prev-30d comparisons, stamps by day of week
+- **Register page** — responsive phone frame (272×560 on phone, 320×660 on desktop), scrollable tab bar
 
 ---
 
@@ -245,7 +254,7 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 - [ ] **Scanner app** — real camera QR/barcode scanning (jsQR library)
 - [ ] **Google Wallet pass status** — COMPLETED on redeem, EXPIRED on expiry
       (so customer sees updated state in their wallet)
-- [ ] **Analytics pages** — wire to real DB data
+- [x] **Analytics page** — ~~wire to real DB data~~ ✅ Done (Session 5)
 - [ ] **Dashboard forms** — loading states, error messages, success toasts
 - [ ] **Google Wallet publishing** — complete 3-step process in Pay Console
 
@@ -338,6 +347,50 @@ git push origin main
 
 ## Change Log
 
+### 2026-05-06 (Session 5 — Analytics Backend + Analytics Page Rewrite + Register Page Fix)
+
+**Backend (nook-backend) — 2 files updated:**
+
+- **`src/routes/analytics.js`** — NEW FILE, registered at `/api/analytics`
+  - Auth-protected (`authMiddleware`)
+  - Superadmin can override bizId via `?bizId=xxx`
+  - Returns: `total_customers`, `new_customers_30d`, `new_customers_prev` (30–60d), `active_cards`, `total_stamps`, `stamps_last_30d`, `stamps_prev_30d`, `total_redemptions`, `redemptions_30d`, `coupons_issued`, `coupons_redeemed`, `stamps_by_day` (Mon=0, Sun=6 using `(d.getDay() + 6) % 7`)
+- **`src/index.js`** — Added `const analyticsRoutes = require('./routes/analytics')` + `app.use('/api/analytics', analyticsRoutes)`
+
+**Frontend (nook-admin) — 4 files updated:**
+
+- **`src/app/(admin)/analytics/page.tsx`** — Complete rewrite (326 lines)
+  - Permission guard: `hasPermission = isSuperadmin || canView(decoded, 'analytics')`
+  - Superadmin business selector dropdown (`api.listBusinesses()`)
+  - KpiCard component with TrendingUp/TrendingDown delta display
+  - DayBarChart (Mon–Sun, 7 bars, stamps by day of week)
+  - FunnelRow (customer → stamp → redeem funnel)
+  - Real API calls via `api.analytics(bizId)`
+- **`src/app/(admin)/register/page.tsx`** — Responsive rewrite (338 lines)
+  - Phone: frame 272×560, desktop: 320×660
+  - Tab bar: horizontal scroll with `overflowX: auto`, `WebkitOverflowScrolling: touch`, `scrollbarWidth: none`
+  - Short labels on phone (`STEP_SHORT`), full labels on desktop (`STEP_LABELS`)
+- **`src/app/(admin)/layout.tsx`** — Fixed truncated GitHub version (196 lines, was 177)
+  - GitHub had an older version missing the full `MORE_GROUPS_ALL` structure and `MoreItem` type
+- **`src/lib/api.ts`** — Added missing `analytics()` method
+  - `analytics(bizId?: string)` → `GET /api/analytics?bizId=xxx` with full return type
+
+**Key technique discovered:** GitHub's CodeMirror 6 web editor requires `execCommand` injection:
+```js
+cmContent.focus();
+document.execCommand('selectAll', false, null);
+document.execCommand('insertText', false, content); // returns true = success
+```
+(Direct CM view object access via JS properties does not work)
+
+**Verification:**
+- `GET /health` → `{"status":"ok","service":"nook-backend"}` ✅
+- `GET /api/analytics` with fake token → HTTP 401 (route live, auth-protected) ✅
+
+**⚠️ Note:** Local `nook-admin` repo is still behind remote. Always `git pull origin main` before local git push.
+
+---
+
 ### 2026-05-06 (Session 4 — Coupons Mobile Layout + Settings Overhaul + More Menu)
 
 **Frontend (nook-admin) — 6 files updated, pushed via GitHub web editor:**
@@ -349,20 +402,28 @@ git push origin main
 - **`src/app/(admin)/settings/page.tsx`** — Full overhaul
   - Tab nav: Workspace / Businesses (superadmin) / Billing / Integrations
   - Mobile: pill-style horizontal scroll tab bar; Desktop: vertical left sidebar nav
-  - Workspace tab: Business name + owner email editable fields, Danger zone
-  - Businesses tab (superadmin only): BizCard with expand → staff users, StaffRow edit/delete, CreateStaffForm
+  - Workspace tab: Business name + owner email editable fields (calls `api.updateProfile`), Danger zone
+  - Businesses tab (superadmin only): `BizCard` with expand → staff users, `StaffRow` edit/delete, `CreateStaffForm`
   - Billing tab: current plan card, plan comparison grid (Basic/Pro/Premium), usage bars
-  - Integrations tab: status list with alert badge (Google Wallet, Apple Wallet, Resend, Web Push, Stripe, Twilio)
-  - Alert count written to localStorage + nook:alerts CustomEvent for Topbar badge
-- **`src/app/(admin)/layout.tsx`** — "More" bottom sheet with grouped accordion (Reports & tools + Admin)
-- **`src/components/layout/Topbar.tsx`** — Alert badge reads from localStorage(nook_alert_count)
+  - Integrations tab: status list (Google Wallet ✓, Apple Wallet ✗, Resend ✗, Web Push ✓, Stripe ✗, Twilio ✗) with alert badge
+  - Alert count written to `localStorage('nook_alert_count')` + `nook:alerts` CustomEvent for Topbar badge
+- **`src/app/(admin)/layout.tsx`** — "More" bottom sheet restructured with grouped accordion
+  - Groups: "Reports & tools" (Analytics, Coupons, Staff scanner) + "Admin" (Settings)
+  - Each group collapsible with ChevronDown/Right; items in 2-column grid with active highlight
+- **`src/components/layout/Topbar.tsx`** — Alert badge on Settings icon reads from `localStorage('nook_alert_count')`
 - **`src/components/layout/Sidebar.tsx`** — Desktop sidebar updated to match new nav structure
-- **`src/lib/api.ts`** — Added 4 business user management methods:
-  - `listBusinessUsers`, `createBusinessUser`, `updateBusinessUser`, `deleteBusinessUser`
-  - All route to `GET/POST/PATCH/DELETE /api/permissions/businesses/:id/users[/:uid]`
+- **`src/lib/api.ts`** — Added 4 superadmin business user management methods:
+  - `listBusinessUsers(bizId)` → `GET /api/permissions/businesses/:id/users`
+  - `createBusinessUser(bizId, data)` → `POST /api/permissions/businesses/:id/users`
+  - `updateBusinessUser(bizId, uid, data)` → `PATCH /api/permissions/businesses/:id/users/:uid`
+  - `deleteBusinessUser(bizId, uid)` → `DELETE /api/permissions/businesses/:id/users/:uid`
 
-**Commits:** `15aef40` (coupons isPhone layout), `083d09e` (api.ts business user methods)
-**Note:** Local nook-admin repo is behind remote. Run `git pull origin main` before next local push.
+**Commits (GitHub web editor — local repo was 5 commits behind remote):**
+- `15aef40`: feat: CouponRow mobile layout - isPhone card view
+- `083d09e`: feat: add listBusinessUsers, createBusinessUser, updateBusinessUser, deleteBusinessUser to api.ts
+- (settings/page.tsx, layout.tsx, Topbar.tsx, Sidebar.tsx committed in earlier part of session)
+
+**⚠️ Note:** Local `nook-admin` repo is behind remote (non-fast-forward). Use `git pull origin main` before next local git push.
 
 ### 2026-05-05 (Session 3 — Scanner Login + Staff Account)
 
@@ -405,7 +466,7 @@ git push origin main
 - Frontend: `src/components/layout/BottomNav.tsx` — filters tabs by permissions
 - Supabase migration done: `businesses` table + `is_superadmin`/`page_permissions` columns, `business_users` table
 - Woosang set as superadmin (is_superadmin = true) via SQL UPDATE
-- Git push via `C:\Users\woosa\Desktop\nook_git_push.bat` (reusable)
+- Git push via `C:\\Users\\woosa\\Desktop\\nook_git_push.bat` (reusable)
 - ⚠️ After Railway deploy: must log out + log back in to get JWT with is_superadmin field
 
 ### 2026-05-02 (Session 1 — Railway Deploy Fix)
