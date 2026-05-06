@@ -13,11 +13,12 @@ const { router: pushRoutes } = require('./services/push')
 const walletRoutes   = require('./routes/wallet')
 const statsRoutes    = require('./routes/stats')
 const permissionsRoutes = require('./routes/permissions')
+const analyticsRoutes   = require('./routes/analytics')
 const schedule       = require('node-schedule')
 
 const app = express()
 
-// ─── Middleware ───────────────────────────────────────────────
+// Middleware
 app.use(cors({
   origin: [
     process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -31,31 +32,32 @@ app.use(cors({
 app.use(express.json({ limit: '1mb' }))
 app.use(express.urlencoded({ extended: true }))
 
-// Rate limiting — prevent spam scanning
+// Rate limiting
 const scanLimiter = rateLimit({
-  windowMs: 60 * 1000,     // 1 minute
-  max: 60,                  // 60 scans/min per IP (1/sec)
+  windowMs: 60 * 1000,
+  max: 60,
   message: { error: 'Too many requests, slow down' }
 })
 
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,   // 15 min
+  windowMs: 15 * 60 * 1000,
   max: 20,
   message: { error: 'Too many auth attempts' }
 })
 
-// ─── Static (dashboard) ──────────────────────────────────
+// Static (dashboard)
 app.use('/dashboard', express.static(path.join(__dirname, 'public')))
 
-// ─── Routes ──────────────────────────────────────────────────
-app.use('/api/auth',      authLimiter, authRoutes)
-app.use('/api/cards',     cardRoutes)
-app.use('/api/customers', customerRoutes)
-app.use('/api/scan',      scanLimiter, scanRoutes)
-app.use('/api/coupons',   couponRoutes)
-app.use('/api/push',      pushRoutes)
-app.use('/api/wallet',    walletRoutes)
+// Routes
+app.use('/api/auth',        authLimiter, authRoutes)
+app.use('/api/cards',       cardRoutes)
+app.use('/api/customers',   customerRoutes)
+app.use('/api/scan',        scanLimiter, scanRoutes)
+app.use('/api/coupons',     couponRoutes)
+app.use('/api/push',        pushRoutes)
+app.use('/api/wallet',      walletRoutes)
 app.use('/api/stats',       statsRoutes)
+app.use('/api/analytics',   analyticsRoutes)
 app.use('/api/permissions', permissionsRoutes)
 
 // Health check
@@ -67,29 +69,23 @@ app.get('/health', (req, res) => {
   })
 })
 
-// ─── Apple Wallet web service endpoints (Step 5) ──────────────
-// /api/wallet/v1/devices/:deviceId/registrations/:passTypeId/:serialNumber
-// /api/wallet/v1/passes/:passTypeId/:serialNumber
-// → Loaded in Step 5 when pkpass is implemented
-
-// ─── 404 handler ─────────────────────────────────────────────
+// 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: `Route ${req.method} ${req.path} not found` })
 })
 
-// ─── Error handler ───────────────────────────────────────────
+// Error handler
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err)
   res.status(500).json({ error: 'Internal server error' })
 })
 
-// ─── Auto-trigger scheduler (daily 9am) ──────────────────────
+// Auto-trigger scheduler (daily 9am)
 schedule.scheduleJob('0 9 * * *', async () => {
   const supabase = require('./db/supabase')
   console.log('[Scheduler] Running daily coupon auto-triggers')
 
   try {
-    // Winback: find coupons with trigger_type = 'winback'
     const { data: winbackCoupons } = await supabase
       .from('coupons')
       .select('id, business_id, valid_days, total_issued')
@@ -97,7 +93,6 @@ schedule.scheduleJob('0 9 * * *', async () => {
       .eq('is_active', true)
 
     for (const coupon of (winbackCoupons || [])) {
-      // Find customers with no stamp in 30+ days who don't already have an active pass
       const cutoff = new Date(Date.now() - 30 * 86_400_000).toISOString()
       const { data: lapsedCustomers } = await supabase
         .from('customers')
@@ -140,7 +135,7 @@ schedule.scheduleJob('0 9 * * *', async () => {
   }
 })
 
-// ─── Start server ────────────────────────────────────────────
+// Start server
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
   console.log(`\n🟢 Nook backend running on port ${PORT}`)
