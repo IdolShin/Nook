@@ -338,6 +338,32 @@ git push origin main
 
 ## Change Log
 
+### 2026-05-06 (Session 4 — Coupons Mobile Layout + Settings Overhaul + More Menu)
+
+**Frontend (nook-admin) — 6 files updated, pushed via GitHub web editor:**
+
+- **`src/app/(admin)/coupons/page.tsx`** — Added `isPhone` mobile card layout to `CouponRow`
+  - `const { isPhone } = useBreakpoint()` added at top of CouponRow
+  - Full mobile card view (icon + title + discount badge row, stats row, controls row with Toggle + Issue button)
+  - Desktop layout unchanged; card switches at phone breakpoint with `borderLeft` color accent
+- **`src/app/(admin)/settings/page.tsx`** — Full overhaul
+  - Tab nav: Workspace / Businesses (superadmin) / Billing / Integrations
+  - Mobile: pill-style horizontal scroll tab bar; Desktop: vertical left sidebar nav
+  - Workspace tab: Business name + owner email editable fields, Danger zone
+  - Businesses tab (superadmin only): BizCard with expand → staff users, StaffRow edit/delete, CreateStaffForm
+  - Billing tab: current plan card, plan comparison grid (Basic/Pro/Premium), usage bars
+  - Integrations tab: status list with alert badge (Google Wallet, Apple Wallet, Resend, Web Push, Stripe, Twilio)
+  - Alert count written to localStorage + nook:alerts CustomEvent for Topbar badge
+- **`src/app/(admin)/layout.tsx`** — "More" bottom sheet with grouped accordion (Reports & tools + Admin)
+- **`src/components/layout/Topbar.tsx`** — Alert badge reads from localStorage(nook_alert_count)
+- **`src/components/layout/Sidebar.tsx`** — Desktop sidebar updated to match new nav structure
+- **`src/lib/api.ts`** — Added 4 business user management methods:
+  - `listBusinessUsers`, `createBusinessUser`, `updateBusinessUser`, `deleteBusinessUser`
+  - All route to `GET/POST/PATCH/DELETE /api/permissions/businesses/:id/users[/:uid]`
+
+**Commits:** `15aef40` (coupons isPhone layout), `083d09e` (api.ts business user methods)
+**Note:** Local nook-admin repo is behind remote. Run `git pull origin main` before next local push.
+
 ### 2026-05-05 (Session 3 — Scanner Login + Staff Account)
 
 **Scanner account created (direct Supabase REST API insert):**
