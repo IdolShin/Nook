@@ -72,7 +72,7 @@ Woosang (operator/admin)
               â¼
     ââââââââââââââââââââ     âââââââââââââââââââââââââââ
     â   Supabase       â     â   Google Wallet API      â
-    â   (Postgres)     â     â   (service account OAuth)â
+    â   (Postgres)     â     â   (service accaccount OAuth)â
     â   mbidmkovjvr... â     â   Issuer: 338800000...   â
     ââââââââââââââââââââ     âââââââââââââââââââââââââââ
 ```
@@ -229,6 +229,7 @@ POST /api/permissions/staff-login       { email, password }  â  { token }  
 - **Dashboard** â real API data: KPI from `api.stats()`, line chart from `api.analytics()` (30d daily), donut from `api.cards()` card_type grouping, activity feed from `api.customers()` (8 newest, `timeAgo()` timestamps)
 - **`/api/analytics` route** â extended: `stamps_daily_30d` + `redemptions_daily_30d` 30-element arrays added to response
 - **Customers page** â Export CSV (Blob download) + CouponPickerModal (send coupon to individual customer via `api.issueCoupon`)
+- **Customers page sort** â sortable columns (Customer/Status/Stamps/Last visit), SortIcon component (ArrowUp/ArrowDown/ChevronsUpDown), fixed empty-state for "no search results" vs "no customers"
 
 ---
 
@@ -356,6 +357,22 @@ git push origin main
 
 ## Change Log
 
+### 2026-05-06 (Session 9 â Customers Page: Sort by Column + No-Results Empty State)
+
+**Frontend (IdolShin/nook-admin) â 1 file updated:**
+
+- **`src/app/(admin)/customers/page.tsx`** â ~526 lines, committed `feat: customers - sort by column + no-results empty state`
+  - Added `ArrowUp, ArrowDown, ChevronsUpDown` to lucide-react imports
+  - **New state**: `sortBy` ('name' | 'stamps' | 'lastVisit' | 'status', default 'name'), `sortDir` ('asc' | 'desc', default 'asc')
+  - **`handleSort`**: toggles direction if same column, resets to 'asc' on new column
+  - **`SortIcon` component**: renders `ChevronsUpDown` (inactive, 35% opacity) or `ArrowUp`/`ArrowDown` (active, green #1D9E75)
+  - **`rows` useMemo** updated: filter first â then sort with STATUS_ORDER map (vip=0, active=1, new=2, at-risk=3)
+  - **Sortable columns**: Customer (name), Status, Stamps, Last visit
+  - **Fixed empty state**: split into `allCustomers.length === 0` ("No customers yet") vs `rows.length === 0` with data ("No results found" + Search icon + Clear filters button)
+  - Commit hash: (Railway deploying)
+
+---
+
 ### 2026-05-06 (Session 8 cont. â Customers Page: Export CSV + Send Coupon Modal)
 
 **Frontend (IdolShin/nook-admin) â 1 file updated:**
@@ -420,26 +437,4 @@ git push origin main
   - `api.stats()` â KPI values (total customers, active cards, stamps, redemptions)
   - `api.analytics()` â `stamps_daily_30d`/`redemptions_daily_30d` â NookLineChart (30d trend)
   - `api.cards()` â groups active cards by `card_type` â NookDonutChart (live card mix)
-  - `api.customers()` â sorted desc by `created_at` â top 8 â activity feed (signup type)
-  - Activity feed: 2-column grid on desktop, shows real customer names + `timeAgo()` timestamps
-  - Fallback: zeros array (30) for line chart, `[{label:'Stamp',value:1}]` for donut when no data
-  - Removed: NookStackedBar, "Top businesses" leaderboard (required multi-business mock data)
-  - Commit: `feat: dashboard - wire charts to real API data`
-
----
-
-### 2026-05-06 (Session 7 â Homepage Mobile Responsive Fix + CLAUDE.md Push)
-
-**Frontend (nook-admin) â 1 file updated, committed `b9ef4dc`:**
-
-- **`src/app/(marketing)/marketing.css`** â Korean mobile responsive overhaul
-  - `word-break: keep-all` added to all Korean-facing text elements:
-    `.h1`, `.h1-sub`, `.section-eyebrow`, `.section-title`, `.section-sub`,
-    `.reason h3`, `.reason p`, `.journey-caption h3`, `.journey-caption p`,
-    `.faq-item summary`, `.cta-banner h2`
-  - `overflow-wrap: break-word` added to `.h1`, `.section-title`, `.cta-banner h2`
-  - 980px tablet breakpoint: added `html, body { overflow-x: hidden; max-width: 100vw; }`
-  - 980px: `.h1` reduced from 42px â 38px; `.phones` height 460â420px
-  - 980px: `.hero-grid` changed from `1fr 1fr` to `55fr 45fr; gap: 32px`
-  - 767px mobile: `.h1` â `clamp(28px, 7.5vw, 40px)`, `.h1-sub` â `clamp(14px, 4vw, 17px)`
-  - Commit mess
+  - `api.customers()` â sorted desc by `created_at` â top 8 â activit
