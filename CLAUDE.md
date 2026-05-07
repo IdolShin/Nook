@@ -53,7 +53,7 @@ Woosang (operator/admin)
 âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 â                        Railway                           â
 â                                                          â
-â  ââââââââââââââââââââââââ  ââââââââââââââââââââââââââââ â
+â  âââââââââââââââââââââââ  ââââââââââââââââââââââââââââ â
 â  â   nook-backend       â  â   nook-admin (Next.js)   â â
 â  â   Node.js/Express    â  â   App Router + proxy.ts  â â
 â  â   :3001              â  â   :3000                  â â
@@ -228,6 +228,7 @@ POST /api/permissions/staff-login       { email, password }  â  { token }  
 - **Homepage mobile responsive** â `marketing.css` Korean text `word-break: keep-all`, 980px `overflow-x: hidden`, hero grid 55fr/45fr, h1 clamp(28px,7.5vw,40px)
 - **Dashboard** â real API data: KPI from `api.stats()`, line chart from `api.analytics()` (30d daily), donut from `api.cards()` card_type grouping, activity feed from `api.customers()` (8 newest, `timeAgo()` timestamps)
 - **`/api/analytics` route** â extended: `stamps_daily_30d` + `redemptions_daily_30d` 30-element arrays added to response
+- **Customers page** â Export CSV (Blob download) + CouponPickerModal (send coupon to individual customer via `api.issueCoupon`)
 
 ---
 
@@ -250,9 +251,11 @@ POST /api/permissions/staff-login       { email, password }  â  { token }  
 - [ ] **Resend API key** â add to Railway backend env vars
 - [ ] **Coupon â Google Wallet** â real connection test end-to-end
 - [ ] **Scanner app** â wire coupon scan to real `POST /api/coupons/redeem`
-- [x] **Homepage** â Done (Session 7) â `mobile responsive fix: `word-break: keep-all` on all Korean text, `overflow-x: hidden` at 980px, hero grid 55fr/45fr, h1 clamp
+- [x] **Homepage** â Done (Session 7) â mobile responsive fix: `word-break: keep-all` on all Korean text, `overflow-x: hidden` at 980px, hero grid 55fr/45fr, h1 clamp
 - [x] **Dashboard charts** â Done (Session 7) â wired to real API: KPI stats, line chart (30d stamps/redeems), donut (card type mix), activity feed (recent signups)
-- [x] **New Card registration bug** ✅ Done (Session 8) — fixed 502 caused by truncated analytics.js on GitHub
+- [x] **New Card registration bug** â Done (Session 8) â fixed 502 caused by truncated analytics.js on GitHub
+- [x] **Customers page â Export CSV** â Done (Session 8) â Blob download with Name/Phone/Status/Stamps/Joined/LastVisit
+- [x] **Customers page â Send coupon** â Done (Session 8) â CouponPickerModal per-customer coupon dispatch
 
 ### ð¡ Medium Priority
 - [ ] **Customer registration page** â connect to real backend
@@ -265,7 +268,7 @@ POST /api/permissions/staff-login       { email, password }  â  { token }  
 - [ ] **Google Wallet publishing** â complete 3-step process in Pay Console
 
 ### ð¢ Later / Nice to Have
-- [ ] **Apple Wallet** â +99/yr Apple Developer account needed
+- [ ] **Apple Wallet** â $99/yr Apple Developer account needed
 - [ ] **Stripe integration** â subscription billing per plan
 - [ ] **Google Review coupon** â customer leaves review â auto-issue coupon
 - [ ] **SMS notifications** â Twilio or similar
@@ -274,7 +277,7 @@ POST /api/permissions/staff-login       { email, password }  â  { token }  
 
 ---
 
-## Wantedeatures
+## Wanted Features
 
 ### 1. Coupon Wallet Flow (priority)
 1. Owner sends coupon (e.g. "Free garlic bread") to loyal customers
@@ -353,24 +356,46 @@ git push origin main
 
 ## Change Log
 
-### 2026-05-07 (Session 8 — 새 카드 등록 버그 수정 / Backend 502 Fix)
+### 2026-05-06 (Session 8 cont. â Customers Page: Export CSV + Send Coupon Modal)
 
-**Root Cause:** `src/routes/analytics.js`가 이전 세션에서 GitHub 웹 에디터의 `document.execCommand('insertText')` 주입 방식으로 커밋될 때 파일이 중간에 잘림 (6008자에서 truncate). `res.json()`, catch 블록, `module.exports = router`가 누락되어 Node.js가 `SyntaxError: Unexpected end of input`을 발생시키며 서버 크래시 → 전체 API 502 Bad Gateway.
+**Frontend (IdolShin/nook-admin) â 1 file updated:**
 
-**Backend (IdolShin/Nook) — 1 file fixed:**
+- **`src/app/(admin)/customers/page.tsx`** â 426 lines (was 404 lines), committed `feat: customers - export CSV + send coupon modal`
+  - Added `ApiCoupon` to imports from `@/lib/api`
+  - Added `ResponsiveModal` import from `@/components/ui/ResponsiveModal`
+  - **`CouponPickerModal`** new component (before `CustomerDetail`):
+    - Loads active coupons via `api.coupons()` on mount
+    - Issues coupon to single customer: `api.issueCoupon(couponId, { customer_ids: [customer.id], send_push: true })`
+    - Visual state: loading / empty state (no active coupons) / coupon list with issue button
+    - Success: button shows `â ë°ì¡ë¨` â auto-closes after 1400ms
+    - Error: calls `toast(msg, 'error')`
+  - **`CustomerDetail`** â added `onSendCoupon?: () => void` prop + "Send coupon" dashed-border button wired to it
+  - **`CustomersPage`** â added `showCouponPicker` state + `handleExportCSV` function:
+    - `handleExportCSV`: CSV headers (Name, Phone, Status, Stamps, Joined, Last Visit) â Blob â URL.createObjectURL â `<a download>` click â revoke URL
+    - Export CSV button in toolbar wired to `handleExportCSV`
+    - Both `CustomerDetail` instances (mobile sheet + desktop panel) have `onSendCoupon={() => setShowCouponPicker(true)}`
+    - `CouponPickerModal` rendered when `showCouponPicker && selected`
 
-- **`src/routes/analytics.js`** — 완전한 파일로 재커밋 (148줄, 5.25KB)
-  - Unicode box-drawing chars (`─`) 제거 (인코딩 문제 방지)
-  - Supabase 체인 단일 라인으로 압축 (파일 크기 축소)
-  - `res.json({...})`, catch block, `module.exports = router` 모두 포함 확인
+---
+
+### 2026-05-07 (Session 8 â ì ì¹´ë ë±ë¡ ë²ê·¸ ìì  / Backend 502 Fix)
+
+**Root Cause:** `src/routes/analytics.js`ê° ì´ì  ì¸ììì GitHub ì¹ ìëí°ì `document.execCommand('insertText')` ì£¼ì ë°©ìì¼ë¡ ì»¤ë°ë  ë íì¼ì´ ì¤ê°ì ìë¦¼ (6008ììì truncate). `res.json()`, catch ë¸ë¡, `module.exports = router`ê° ëë½ëì´ Node.jsê° `SyntaxError: Unexpected end of input`ì ë°ììí¤ë©° ìë² í¬ëì â ì ì²´ API 502 Bad Gateway.
+
+**Backend (IdolShin/Nook) â 1 file fixed:**
+
+- **`src/routes/analytics.js`** â ìì í íì¼ë¡ ì¬ì»¤ë° (148ì¤, 5.25KB)
+  - Unicode box-drawing chars (`â`) ì ê±° (ì¸ì½ë© ë¬¸ì  ë°©ì§)
+  - Supabase ì²´ì¸ ë¨ì¼ ë¼ì¸ì¼ë¡ ìì¶ (íì¼ í¬ê¸° ì¶ì)
+  - `res.json({...})`, catch block, `module.exports = router` ëª¨ë í¬í¨ íì¸
   - Commit: `fix: analytics.js - restore complete file (was truncated, caused 502)` (hash: `9bc4fce`)
 
 **Verified:**
-- `/health` → `{"status":"ok"}` ✅
-- New Card 등록 → "Bug Fix Test Card" 생성 성공, 목록에 즉시 반영 ✅
-- 대시보드 로그인 정상 ✅
+- `/health` â `{"status":"ok"}` â
+- New Card ë±ë¡ â "Bug Fix Test Card" ìì± ì±ê³µ, ëª©ë¡ì ì¦ì ë°ì â
+- ëìë³´ë ë¡ê·¸ì¸ ì ì â
 
-**⚠️ execCommand 주입 방식 경고:** GitHub 웹 에디터에서 `document.execCommand('insertText', false, content)` 방식으로 긴 파일(>5000자)을 주입하면 파일이 truncate될 수 있음. 향후 긴 파일은 Git CLI 또는 GitHub API를 통해 직접 커밋 권장.
+**â ï¸ execCommand ì£¼ì ë°©ì ê²½ê³ :** GitHub ì¹ ìëí°ìì `document.execCommand('insertText', false, content)` ë°©ìì¼ë¡ ê¸´ íì¼(>5000ì)ì ì£¼ìíë©´ íì¼ì´ truncateë  ì ìì. í¥í ê¸´ íì¼ì Git CLI ëë GitHub APIë¥¼ íµí´ ì§ì  ì»¤ë° ê¶ì¥.
 
 ---
 
@@ -417,73 +442,4 @@ git push origin main
   - 980px: `.h1` reduced from 42px â 38px; `.phones` height 460â420px
   - 980px: `.hero-grid` changed from `1fr 1fr` to `55fr 45fr; gap: 32px`
   - 767px mobile: `.h1` â `clamp(28px, 7.5vw, 40px)`, `.h1-sub` â `clamp(14px, 4vw, 17px)`
-  - Commit message: `fix: homepage mobile responsive - word-break keep-all, 980px overflow fix`
-
-**Backend (IdolShin/Nook) â 1 file pushed, commit `21b5075`:**
-- **`CLAUDE.md`** â Session 6 changelog recorded
-
----
-
-### 2026-05-06 (Session 6 â Cards CardDesigner + Register API + Scanner Coupon + GitHub Push)
-
-**Frontend (nook-admin) â 4 files updated, pushed via GitHub web editor (commit `02e9c72`):**
-
-- **`src/app/(admin)/cards/page.tsx`** â Added CardDesigner modal (611 lines total)
-  - `StampGrid`: auto-layout (â¤7 stamps = single row, >7 = two rows via `Math.ceil/floor`)
-  - `WalletCardPreview`: white wallet card with CSS barcode (38 bars) + serial `NK-{id.slice(0,6).toUpperCase()}`
-  - `CardDesigner`: full-screen modal, 3 tabs (ì¹´ë ë¯¸ë¦¬ë³´ê¸°, ìë  ì¹´ë, ê°ì QR)
-  - Edit card form: name, color, goal_stamps, reward_desc, is_active â calls `PATCH /api/cards/:id`
-- **`src/app/(admin)/register/page.tsx`** â Connected to real backend (`POST /api/customers/register`)
-- **`src/app/(staff)/scan/page.tsx`** â Coupon barcode scan mode + `POST /api/coupons/redeem`
-- **`src/lib/api.ts`** â `updateProfile()` extended: `phone?: string`, `address?: string`
-
----
-
-### 2026-05-06 (Session 5 â Analytics Backend + Analytics Page Rewrite + Register Page Fix)
-
-**Backend (nook-backend) â 2 files updated:**
-
-- **`src/routes/analytics.js`** â NEW FILE at `/api/analytics` (auth-protected, superadmin bizId override)
-- **`src/index.js`** â Registered `/api/analytics` routes
-
-**Frontend (nook-admin) â 4 files updated:**
-
-- **`src/app/(admin)/analytics/page.tsx`** â Complete rewrite: KPI cards, DayBarChart, FunnelRow, real API
-- **`src/app/(admin)/register/page.tsx`** â Responsive rewrite (phone 272Ã560, desktop 320Ã660)
-- **`src/app/(admin)/layout.tsx`** â Fixed truncated GitHub version (196 lines)
-- **`src/lib/api.ts`** â Added `analytics(bizId?)` method
-
----
-
-### 2026-05-06 (Session 4 â Coupons Mobile Layout + Settings Overhaul + More Menu)
-
-**Frontend (nook-admin) â 6 files updated:**
-
-- **`src/app/(admin)/coupons/page.tsx`** â `isPhone` mobile card layout in `CouponRow`
-- **`src/app/(admin)/settings/page.tsx`** â Workspace / Businesses / Billing / Integrations tabs
-- **`src/app/(admin)/layout.tsx`** â "More" bottom sheet with grouped accordion
-- **`src/components/layout/Topbar.tsx`** â Alert badge on Settings icon
-- **`src/components/layout/Sidebar.tsx`** â Desktop sidebar updated
-- **`src/lib/api.ts`** â Added `listBusinessUsers`, `createBusinessUser`, `updateBusinessUser`, `deleteBusinessUser`
-
----
-
-### 2026-05-05 (Session 3 â Scanner Login + Staff Account)
-
-- Scanner account: `scanner@nookcafe.com` / `nookcafe2024` (role: `viewer`, scanner: `admin`)
-- New `/scan-login` page using `POST /api/permissions/staff-login`
-- Commits: nook-admin `571a7b5`, backend `14e1fd3`
-
----
-
-### 2026-05-02 (Session 2 â Permissions System)
-- Full permissions system: VIEW/EDIT/ADMIN per page per business/staff
-- Supabase: `businesses.is_superadmin`, `businesses.page_permissions`, `business_users` table
-- Woosang set as superadmin
-
----
-
-### 2026-05-02 (Session 1 â Railway Deploy Fix)
-- Fixed `/auth` 404 â Next.js 16 `middleware.ts` â `proxy.ts`
-- Fixed "Failed to fetch" on login â `NEXT_PUBLIC_API_URL` + CORS
-- Dashboard login working at `https://nook-admin-production.up.railway.app/auth`
+  - Commit mess
