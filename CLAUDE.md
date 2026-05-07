@@ -257,10 +257,11 @@ POST /api/permissions/staff-login       { email, password }  â  { token }  
 - [x] **New Card registratio bug** â Done (Session 8) â fixed 502 caused by truncated analytics.js on GitHub
 - [x] **Customers page â Export CSV** â Done (Session 8) â Blob download with Name/Phone/Status/Stamps/Joined/LastVisit
 - [x] **Customers page â Send coupon** â Done (Session 8) â CouponPickerModal per-customer coupon dispatch
+- [x] **api.ts registerCustomer** ✅ Done (Session 11) — `registerCustomer()` added to api.ts, calls `POST /api/customers/register`
+- [x] **Register page API** ✅ Done (Session 11) — name field added, `handleRegister` wired to real backend, card_id from URL param
 
 ### ð¡ Medium Priority
-- [ ] **Customer registration page** â connect to real backend
-      (QR scan â landing page â Add to Wallet flow)
+- [x] **Customer registration page** — ✅ Done (Session 11) — connected to real backend (`POST /api/customers/register`), name + phone fields, card_id from URL `?card_id=` param
 - [ ] **Scanner app** â real camera QR/barcode scanning (jsQR library)
 - [ ] **Google Wallet pass status** â COMPLETED on redeem, EXPIRED on expiry
       (so customer sees updated state in their wallet)
@@ -356,6 +357,33 @@ git push origin main
 ---
 
 ## Change Log
+
+### 2026-05-07 (Session 11 — Register Page API + Git Worktree Fix)
+
+**Frontend (IdolShin/nook-admin) — 2 files updated:**
+
+- **`src/lib/api.ts`** — Added `registerCustomer()` method (commits `7f81b02` → fixed `2a7b7d2`)
+  - `registerCustomer(data: { card_id, name, phone, consent_push?, consent_points? }) → Promise<{ customer: ApiCustomer }>`
+  - Calls `POST /api/customers/register` (public endpoint, no auth header)
+  - `consent_push` + `consent_points` default to `true`
+  - Error parsed from `res.json().error` field
+
+- **`src/app/(admin)/register/page.tsx`** — 380 lines (was 344), commit `48ad108`
+  - Added `import { useSearchParams } from 'next/navigation'` + `import { api } from '@/lib/api'`
+  - **`Step1` rewritten**: now accepts controlled `name`/`phone` props + `onNameChange`/`onPhoneChange` callbacks + `loading`/`error` props
+    - Added Name input field above phone input
+    - Error banner shown when `error` prop is set
+    - Button text changes to `'Registering...'` when loading, `disabled` during loading
+  - **`RegisterPage` rewritten**: added `useSearchParams` to read `?card_id=` URL param, state for `name`/`phone`/`loading`/`regError`, `async handleRegister()` that calls `api.registerCustomer()`, inline step rendering replacing the old `STEPS[step]` pattern
+  - Step 1 description panel updated to reflect real API call behavior
+
+**Backend (IdolShin/Nook) — no code changes:**
+
+- **Git worktree fixed** (no commit needed): `.claude/worktrees/naughty-bhaskara-9f4139/.git` had Windows absolute path in `gitdir`. Overwrote with relative path `gitdir: ../../../.git/worktrees/naughty-bhaskara-9f4139`. `git status` now works normally.
+- **`src/routes/analytics.js`** — confirmed intact (200 lines) via Read tool. Linux sandbox mount was serving stale 172-line cached version — false alarm.
+- **`CLAUDE.md`** — Session 8 changelog pushed via CodeMirror dispatch (commit `706c4fa`)
+
+---
 
 ### 2026-05-06 (Session 10 â Coupons Error Handling + GitHub Push)
 
