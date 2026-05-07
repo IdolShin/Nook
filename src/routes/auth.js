@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const supabase = require('../db/supabase')
 
-const SUPERADMIN_EMAIL = 'woosang930414@gmail.com'
+const SUPERADMIN_EMAILS = ['woosang930414@gmail.com', 'woosang@nook.com']
 
 // ─── Helper: build JWT payload with permissions ──────────────
 function buildToken(biz) {
@@ -14,7 +14,7 @@ function buildToken(biz) {
       email: biz.owner_email,
       name: biz.name,
       plan: biz.plan,
-      is_superadmin: biz.is_superadmin || biz.owner_email === SUPERADMIN_EMAIL || false,
+      is_superadmin: biz.is_superadmin || SUPERADMIN_EMAILS.includes(biz.owner_email) || false,
       page_permissions: biz.page_permissions || null,  // null = full access
     },
     process.env.JWT_SECRET,
@@ -129,7 +129,7 @@ router.post('/google', async (req, res) => {
           google_id,
           logo_url: picture,
           auth_provider: 'google',
-          is_superadmin: email === SUPERADMIN_EMAIL,
+          is_superadmin: SUPERADMIN_EMAILS.includes(email),
         })
         .select('id, name, owner_email, plan, is_superadmin, page_permissions')
         .single()
