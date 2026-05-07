@@ -53,7 +53,7 @@ Woosang (operator/admin)
 âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 â                        Railway                           â
 â                                                          â
-â  âââââââââââââââââââââââ  ââââââââââââââââââââââââââââ â
+â  ââââââââââââââââââââââââ  ââââââââââââââââââââââââââââ â
 â  â   nook-backend       â  â   nook-admin (Next.js)   â â
 â  â   Node.js/Express    â  â   App Router + proxy.ts  â â
 â  â   :3001              â  â   :3000                  â â
@@ -224,8 +224,10 @@ POST /api/permissions/staff-login       { email, password }  â  { token }  
 - **Cards page** â CardDesigner modal (3 tabs: ì¹´ë ë¯¸ë¦¬ë³´ê¸°, ìë  ì¹´ë, ê°ì QR), StampGrid auto-layout, WalletCardPreview with CSS barcode, RegistrationQRCard
 - **Register page** â connected to real backend (`POST /api/customers/register`), QR param pre-fill, success flow
 - **Scanner page** â coupon barcode scan mode added (toggle stamp/coupon), `POST /api/coupons/redeem` wired
-- **api.ts** â `updateProfile` extended with `phone` + `address` fields
+- **api.ts** â `updateProfile` extended with `phone` + `address` fields; `analytics()` return type extended with `stamps_daily_30d` + `redemptions_daily_30d`
 - **Homepage mobile responsive** â `marketing.css` Korean text `word-break: keep-all`, 980px `overflow-x: hidden`, hero grid 55fr/45fr, h1 clamp(28px,7.5vw,40px)
+- **Dashboard** â real API data: KPI from `api.stats()`, line chart from `api.analytics()` (30d daily), donut from `api.cards()` card_type grouping, activity feed from `api.customers()` (8 newest, `timeAgo()` timestamps)
+- **`/api/analytics` route** â extended: `stamps_daily_30d` + `redemptions_daily_30d` 30-element arrays added to response
 
 ---
 
@@ -248,7 +250,8 @@ POST /api/permissions/staff-login       { email, password }  â  { token }  
 - [ ] **Resend API key** â add to Railway backend env vars
 - [ ] **Coupon â Google Wallet** â real connection test end-to-end
 - [ ] **Scanner app** â wire coupon scan to real `POST /api/coupons/redeem`
-- [x] **Homepage** â Done (Session 7) â mobile responsive fix: `word-break: keep-all` on all Korean text, `overflow-x: hidden` at 980px, hero grid 55fr/45fr, h1 clamp
+- [x] **Homepage** â Done (Session 7) â `mobile responsive fix: `word-break: keep-all` on all Korean text, `overflow-x: hidden` at 980px, hero grid 55fr/45fr, h1 clamp
+- [x] **Dashboard charts** â Done (Session 7) â wired to real API: KPI stats, line chart (30d stamps/redeems), donut (card type mix), activity feed (recent signups)
 
 ### ð¡ Medium Priority
 - [ ] **Customer registration page** â connect to real backend
@@ -261,7 +264,7 @@ POST /api/permissions/staff-login       { email, password }  â  { token }  
 - [ ] **Google Wallet publishing** â complete 3-step process in Pay Console
 
 ### ð¢ Later / Nice to Have
-- [ ] **Apple Wallet** â $99/yr Apple Developer account needed
+- [ ] **Apple Wallet** â +99/yr Apple Developer account needed
 - [ ] **Stripe integration** â subscription billing per plan
 - [ ] **Google Review coupon** â customer leaves review â auto-issue coupon
 - [ ] **SMS notifications** â Twilio or similar
@@ -270,7 +273,7 @@ POST /api/permissions/staff-login       { email, password }  â  { token }  
 
 ---
 
-## Wanted Features
+## Wantedeatures
 
 ### 1. Coupon Wallet Flow (priority)
 1. Owner sends coupon (e.g. "Free garlic bread") to loyal customers
@@ -349,6 +352,35 @@ git push origin main
 
 ## Change Log
 
+### 2026-05-06 (Session 7 cont. â Dashboard Real Data + api.ts Types)
+
+**Backend (IdolShin/Nook) â 1 file updated:**
+
+- **`src/routes/analytics.js`** â Extended response with two new 30-element arrays:
+  - `stamps_daily_30d`: daily stamp counts for last 30 days (index 0 = 30 days ago, index 29 = today)
+  - `redemptions_daily_30d`: daily redemption counts for last 30 days
+  - Commit: `feat: analytics - add stamps_daily_30d + redemptions_daily_30d`
+
+**Frontend (IdolShin/nook-admin) â 2 files updated:**
+
+- **`src/lib/api.ts`** â Added `stamps_daily_30d: number[]` + `redemptions_daily_30d: number[]` to `analytics()` return type
+  - Commit: `feat: api.ts - add stamps_daily_30d + redemptions_daily_30d types`
+
+- **`src/app/(admin)/dashboard/page.tsx`** â Complete rewrite (326 lines), all mock data replaced with real API:
+  - Added `CARD_TYPE_COLORS` map: stamp=#1D9E75, coupon=#3B6BCC, membership=#C53A6B, cashback=#C26B1F
+  - Added `timeAgo(isoDate)` helper: mins/hours/days relative timestamp
+  - State: `stampsTrend`, `redeemsTrend`, `cardTypeMix`, `recentActivity`
+  - `api.stats()` â KPI values (total customers, active cards, stamps, redemptions)
+  - `api.analytics()` â `stamps_daily_30d`/`redemptions_daily_30d` â NookLineChart (30d trend)
+  - `api.cards()` â groups active cards by `card_type` â NookDonutChart (live card mix)
+  - `api.customers()` â sorted desc by `created_at` â top 8 â activity feed (signup type)
+  - Activity feed: 2-column grid on desktop, shows real customer names + `timeAgo()` timestamps
+  - Fallback: zeros array (30) for line chart, `[{label:'Stamp',value:1}]` for donut when no data
+  - Removed: NookStackedBar, "Top businesses" leaderboard (required multi-business mock data)
+  - Commit: `feat: dashboard - wire charts to real API data`
+
+---
+
 ### 2026-05-06 (Session 7 â Homepage Mobile Responsive Fix + CLAUDE.md Push)
 
 **Frontend (nook-admin) â 1 file updated, committed `b9ef4dc`:**
@@ -361,15 +393,12 @@ git push origin main
   - `overflow-wrap: break-word` added to `.h1`, `.section-title`, `.cta-banner h2`
   - 980px tablet breakpoint: added `html, body { overflow-x: hidden; max-width: 100vw; }`
   - 980px: `.h1` reduced from 42px â 38px; `.phones` height 460â420px
-  - 980px: `.hero-grid` changed from `1fr 1fr` to `55fr 45fr; gap: 32px` (text gets more space)
-  - 767px mobile: `.h1` â `clamp(28px, 7.5vw, 40px)` (was `clamp(26px, 7.5vw, 40px)`)
-  - 767px mobile: `.h1-sub` â `clamp(14px, 4vw, 17py)`, `max-width: 100%`
+  - 980px: `.hero-grid` changed from `1fr 1fr` to `55fr 45fr; gap: 32px`
+  - 767px mobile: `.h1` â `clamp(28px, 7.5vw, 40px)`, `.h1-sub` â `clamp(14px, 4vw, 17px)`
   - Commit message: `fix: homepage mobile responsive - word-break keep-all, 980px overflow fix`
 
 **Backend (IdolShin/Nook) â 1 file pushed, commit `21b5075`:**
 - **`CLAUDE.md`** â Session 6 changelog recorded
-
-**Technique used:** GitHub web editor + base64 chunking (4500 chars/chunk Ã 11 chunks = 48340 chars) + CodeMirror 6 `execCommand` injection + React fiber `onChange` trigger + `EditPermissionsContext` patch
 
 ---
 
@@ -379,7 +408,60 @@ git push origin main
 
 - **`src/app/(admin)/cards/page.tsx`** â Added CardDesigner modal (611 lines total)
   - `StampGrid`: auto-layout (â¤7 stamps = single row, >7 = two rows via `Math.ceil/floor`)
-  - `CardDesignPreview`: 340Ã206 gradient card with logo, stamps, biz name, reward text
-  - `WalletCardPreview`: white wallet card with CSS barcode (38 bars, deterministic from card.id) + serial `NK-{id.slice(0,6).toUpperCase()}`
-  - `RegistrationQRCard`: QR via `api.qrserver.com` to `/register?card={id}`
-  - `CardDesigner`: full-screen modal, 3 tabs (ì¹´ë ë¯¸ë¦¬ë³´ê¸°, ìë  ì¹
+  - `WalletCardPreview`: white wallet card with CSS barcode (38 bars) + serial `NK-{id.slice(0,6).toUpperCase()}`
+  - `CardDesigner`: full-screen modal, 3 tabs (ì¹´ë ë¯¸ë¦¬ë³´ê¸°, ìë  ì¹´ë, ê°ì QR)
+  - Edit card form: name, color, goal_stamps, reward_desc, is_active â calls `PATCH /api/cards/:id`
+- **`src/app/(admin)/register/page.tsx`** â Connected to real backend (`POST /api/customers/register`)
+- **`src/app/(staff)/scan/page.tsx`** â Coupon barcode scan mode + `POST /api/coupons/redeem`
+- **`src/lib/api.ts`** â `updateProfile()` extended: `phone?: string`, `address?: string`
+
+---
+
+### 2026-05-06 (Session 5 â Analytics Backend + Analytics Page Rewrite + Register Page Fix)
+
+**Backend (nook-backend) â 2 files updated:**
+
+- **`src/routes/analytics.js`** â NEW FILE at `/api/analytics` (auth-protected, superadmin bizId override)
+- **`src/index.js`** â Registered `/api/analytics` routes
+
+**Frontend (nook-admin) â 4 files updated:**
+
+- **`src/app/(admin)/analytics/page.tsx`** â Complete rewrite: KPI cards, DayBarChart, FunnelRow, real API
+- **`src/app/(admin)/register/page.tsx`** â Responsive rewrite (phone 272Ã560, desktop 320Ã660)
+- **`src/app/(admin)/layout.tsx`** â Fixed truncated GitHub version (196 lines)
+- **`src/lib/api.ts`** â Added `analytics(bizId?)` method
+
+---
+
+### 2026-05-06 (Session 4 â Coupons Mobile Layout + Settings Overhaul + More Menu)
+
+**Frontend (nook-admin) â 6 files updated:**
+
+- **`src/app/(admin)/coupons/page.tsx`** â `isPhone` mobile card layout in `CouponRow`
+- **`src/app/(admin)/settings/page.tsx`** â Workspace / Businesses / Billing / Integrations tabs
+- **`src/app/(admin)/layout.tsx`** â "More" bottom sheet with grouped accordion
+- **`src/components/layout/Topbar.tsx`** â Alert badge on Settings icon
+- **`src/components/layout/Sidebar.tsx`** â Desktop sidebar updated
+- **`src/lib/api.ts`** â Added `listBusinessUsers`, `createBusinessUser`, `updateBusinessUser`, `deleteBusinessUser`
+
+---
+
+### 2026-05-05 (Session 3 â Scanner Login + Staff Account)
+
+- Scanner account: `scanner@nookcafe.com` / `nookcafe2024` (role: `viewer`, scanner: `admin`)
+- New `/scan-login` page using `POST /api/permissions/staff-login`
+- Commits: nook-admin `571a7b5`, backend `14e1fd3`
+
+---
+
+### 2026-05-02 (Session 2 â Permissions System)
+- Full permissions system: VIEW/EDIT/ADMIN per page per business/staff
+- Supabase: `businesses.is_superadmin`, `businesses.page_permissions`, `business_users` table
+- Woosang set as superadmin
+
+---
+
+### 2026-05-02 (Session 1 â Railway Deploy Fix)
+- Fixed `/auth` 404 â Next.js 16 `middleware.ts` â `proxy.ts`
+- Fixed "Failed to fetch" on login â `NEXT_PUBLIC_API_URL` + CORS
+- Dashboard login working at `https://nook-admin-production.up.railway.app/auth`
