@@ -55,7 +55,7 @@ Woosang (operator/admin)
 â                                                          â
 â  âââââââââââââââââââââââ  ââââââââââââââââââââââââââââ â
 â  â   nook-backend       â  â   nook-admin (Next.js)   â â
-â  â   Node.js/Express    â  â   App Router + proxy.ts  â â
+â  â   Node.js/Express    â  â   Ap App Router + proxy.ts  â â
 â  â   :3001              â  â   :3000                  â â
 â  â                      â  â                          â â
 â  â  /api/auth           â  â  / (homepage)            â â
@@ -72,7 +72,7 @@ Woosang (operator/admin)
               â¼
     ââââââââââââââââââââ     âââââââââââââââââââââââââââ
     â   Supabase       â     â   Google Wallet API      â
-    â   (Postgres)     â     â   (service accaccount OAuth)â
+    â   (Postgres)     â     â   (service account OAuth)â
     â   mbidmkovjvr... â     â   Issuer: 338800000...   â
     ââââââââââââââââââââ     âââââââââââââââââââââââââââ
 ```
@@ -254,7 +254,7 @@ POST /api/permissions/staff-login       { email, password }  â  { token }  
 - [ ] **Scanner app** â wire coupon scan to real `POST /api/coupons/redeem`
 - [x] **Homepage** â Done (Session 7) â mobile responsive fix: `word-break: keep-all` on all Korean text, `overflow-x: hidden` at 980px, hero grid 55fr/45fr, h1 clamp
 - [x] **Dashboard charts** â Done (Session 7) â wired to real API: KPI stats, line chart (30d stamps/redeems), donut (card type mix), activity feed (recent signups)
-- [x] **New Card registration bug** â Done (Session 8) â fixed 502 caused by truncated analytics.js on GitHub
+- [x] **New Card registratio bug** â Done (Session 8) â fixed 502 caused by truncated analytics.js on GitHub
 - [x] **Customers page â Export CSV** â Done (Session 8) â Blob download with Name/Phone/Status/Stamps/Joined/LastVisit
 - [x] **Customers page â Send coupon** â Done (Session 8) â CouponPickerModal per-customer coupon dispatch
 
@@ -357,6 +357,28 @@ git push origin main
 
 ## Change Log
 
+### 2026-05-06 (Session 10 â Coupons Error Handling + GitHub Push)
+
+**Frontend (IdolShin/nook-admin) â 1 file updated, pushed via GitHub web editor:**
+
+- **`src/app/(admin)/coupons/page.tsx`** â 691 lines (was 666 lines), committed `fix: coupons - add error handling to CreateModal and IssuePanel`
+  - Added `import { toast } from '@/lib/toast'`
+  - **`CreateModal`**:
+    - Added `const [createError, setCreateError] = useState('')`
+    - `handleCreate`: validates `title.trim()` â sets `createError` + returns early if empty
+    - `catch (e)`: extracts message, calls `setCreateError(msg)` + `toast(msg, 'error')`
+    - Footer: added `{createError && <div style={{ margin: '0 24px', padding: '10px 14px', background: '#FBE2EC', ... }}>{createError}</div>}` above the nav buttons
+  - **`IssuePanel`**:
+    - Added `const [issueError, setIssueError] = useState('')`
+    - `handleIssue`: clears `issueError` at start; `catch (e)` sets `issueError` + `toast(msg, 'error')`
+    - `onDone()` moved from the "Done" button click to after `setResult(...)` in the try block
+    - Added error banner `{issueError && <div ...>}` above the Cancel/Issue buttons
+
+**Also confirmed (no changes needed):**
+- **`src/app/(admin)/customers/page.tsx`** â search (`q`), segment filter (`seg`), sort (`sortBy`/`sortDir`) all already implemented via `useMemo`
+
+---
+
 ### 2026-05-06 (Session 9 â Customers Page: Sort by Column + No-Results Empty State)
 
 **Frontend (IdolShin/nook-admin) â 1 file updated:**
@@ -418,23 +440,4 @@ git push origin main
 
 ### 2026-05-06 (Session 7 cont. â Dashboard Real Data + api.ts Types)
 
-**Backend (IdolShin/Nook) â 1 file updated:**
-
-- **`src/routes/analytics.js`** â Extended response with two new 30-element arrays:
-  - `stamps_daily_30d`: daily stamp counts for last 30 days (index 0 = 30 days ago, index 29 = today)
-  - `redemptions_daily_30d`: daily redemption counts for last 30 days
-  - Commit: `feat: analytics - add stamps_daily_30d + redemptions_daily_30d`
-
-**Frontend (IdolShin/nook-admin) â 2 files updated:**
-
-- **`src/lib/api.ts`** â Added `stamps_daily_30d: number[]` + `redemptions_daily_30d: number[]` to `analytics()` return type
-  - Commit: `feat: api.ts - add stamps_daily_30d + redemptions_daily_30d types`
-
-- **`src/app/(admin)/dashboard/page.tsx`** â Complete rewrite (326 lines), all mock data replaced with real API:
-  - Added `CARD_TYPE_COLORS` map: stamp=#1D9E75, coupon=#3B6BCC, membership=#C53A6B, cashback=#C26B1F
-  - Added `timeAgo(isoDate)` helper: mins/hours/days relative timestamp
-  - State: `stampsTrend`, `redeemsTrend`, `cardTypeMix`, `recentActivity`
-  - `api.stats()` â KPI values (total customers, active cards, stamps, redemptions)
-  - `api.analytics()` â `stamps_daily_30d`/`redemptions_daily_30d` â NookLineChart (30d trend)
-  - `api.cards()` â groups active cards by `card_type` â NookDonutChart (live card mix)
-  - `api.customers()` â sorted desc by `created_at` â top 8 â activit
+**Backend (
