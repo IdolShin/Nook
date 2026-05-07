@@ -385,6 +385,24 @@ git push origin main
 
 ---
 
+### 2026-05-07 (Session 11 — Restore Truncated nook-admin Files)
+
+**Root Cause:** Multiple `nook-admin` files were truncated in sessions 7-8 by `document.execCommand('insertText', false, content)` which silently truncates content when the file is larger than ~5000 characters. Files were committed as broken truncated versions.
+
+**Frontend (IdolShin/nook-admin) — 4 files fully restored:**
+
+- **`src/app/(marketing)/marketing.css`** — Restored complete file (commit `b186a2c`)
+- **`src/app/(admin)/dashboard/page.tsx`** — Restored complete 326-line file (commit `3dc0d06`)
+- **`src/lib/api.ts`** — Restored complete file with all API methods (commit `8bfb4fa`)
+- **`src/app/(admin)/cards/page.tsx`** — Restored from 612-line truncated version to 1029-line complete file (commit `3eb9ae7`)
+  - Contains full: TypePill, StatusPill, FilterDropdown, NewCardModal, EditCardModal, StampGrid, CardDesignPreview, WalletCardPreview, RegistrationQRCard, CardDesigner, CardTile, CardsTable, CardDetail, CardsPage
+
+**Method:** Base64 chunked injection via `atob()` + CodeMirror EditorView dispatch API. Files split into ~6KB base64 chunks, accumulated in `window._inject`, then dispatched via `view.dispatch({ changes: { from: 0, to: doc.length, insert: content } })`.
+
+**Note:** Box-drawing/emoji characters in comments show as garbled (UTF-8 multi-byte encoding artifact from atob() byte-level decoding) — TypeScript compiles fine since they are in comments only.
+
+---
+
 ### 2026-05-06 (Session 10 â Coupons Error Handling + GitHub Push)
 
 **Frontend (IdolShin/nook-admin) â 1 file updated, pushed via GitHub web editor:**
