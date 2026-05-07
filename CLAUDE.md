@@ -252,6 +252,7 @@ POST /api/permissions/staff-login       { email, password }  â  { token }  
 - [ ] **Scanner app** â wire coupon scan to real `POST /api/coupons/redeem`
 - [x] **Homepage** â Done (Session 7) â `mobile responsive fix: `word-break: keep-all` on all Korean text, `overflow-x: hidden` at 980px, hero grid 55fr/45fr, h1 clamp
 - [x] **Dashboard charts** â Done (Session 7) â wired to real API: KPI stats, line chart (30d stamps/redeems), donut (card type mix), activity feed (recent signups)
+- [x] **New Card registration bug** ✅ Done (Session 8) — fixed 502 caused by truncated analytics.js on GitHub
 
 ### ð¡ Medium Priority
 - [ ] **Customer registration page** â connect to real backend
@@ -351,6 +352,27 @@ git push origin main
 ---
 
 ## Change Log
+
+### 2026-05-07 (Session 8 — 새 카드 등록 버그 수정 / Backend 502 Fix)
+
+**Root Cause:** `src/routes/analytics.js`가 이전 세션에서 GitHub 웹 에디터의 `document.execCommand('insertText')` 주입 방식으로 커밋될 때 파일이 중간에 잘림 (6008자에서 truncate). `res.json()`, catch 블록, `module.exports = router`가 누락되어 Node.js가 `SyntaxError: Unexpected end of input`을 발생시키며 서버 크래시 → 전체 API 502 Bad Gateway.
+
+**Backend (IdolShin/Nook) — 1 file fixed:**
+
+- **`src/routes/analytics.js`** — 완전한 파일로 재커밋 (148줄, 5.25KB)
+  - Unicode box-drawing chars (`─`) 제거 (인코딩 문제 방지)
+  - Supabase 체인 단일 라인으로 압축 (파일 크기 축소)
+  - `res.json({...})`, catch block, `module.exports = router` 모두 포함 확인
+  - Commit: `fix: analytics.js - restore complete file (was truncated, caused 502)` (hash: `9bc4fce`)
+
+**Verified:**
+- `/health` → `{"status":"ok"}` ✅
+- New Card 등록 → "Bug Fix Test Card" 생성 성공, 목록에 즉시 반영 ✅
+- 대시보드 로그인 정상 ✅
+
+**⚠️ execCommand 주입 방식 경고:** GitHub 웹 에디터에서 `document.execCommand('insertText', false, content)` 방식으로 긴 파일(>5000자)을 주입하면 파일이 truncate될 수 있음. 향후 긴 파일은 Git CLI 또는 GitHub API를 통해 직접 커밋 권장.
+
+---
 
 ### 2026-05-06 (Session 7 cont. â Dashboard Real Data + api.ts Types)
 
