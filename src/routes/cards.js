@@ -6,17 +6,16 @@ const { authMiddleware } = require('../middleware/auth')
 // All card routes require auth
 router.use(authMiddleware)
 
-// ─── GET /api/cards ──────────────────────────────────────────
-// 내 가게 카드 목록
+// âââ GET /api/cards ââââââââââââââââââââââââââââââââââââââââââ
+// ë´ ê°ê² ì¹´ë ëª©ë¡ (superadminì ?bizId= ë¡ ë¤ë¥¸ ê°ê² ì¡°í ê°ë¥)
 router.get('/', async (req, res) => {
   try {
+    const bizId = (req.business.is_superadmin && req.query.bizId) ? req.query.bizId : req.business.id
+
     const { data, error } = await supabase
       .from('loyalty_cards')
-      .select(`
-        *,
-        customers ( count )
-      `)
-      .eq('business_id', req.business.id)
+      .select(`*, customers ( count )`)
+      .eq('business_id', bizId)
       .order('created_at', { ascending: false })
 
     if (error) throw error
@@ -26,11 +25,11 @@ router.get('/', async (req, res) => {
   }
 })
 
-// ─── POST /api/cards ─────────────────────────────────────────
-// 새 카드 만들기
+// âââ POST /api/cards âââââââââââââââââââââââââââââââââââââââââ
+// ì ì¹´ë ë§ë¤ê¸° (superadminì body.bizId ë¡ ë¤ë¥¸ ê°ê²ì ì¹´ë ìì± ê°ë¥)
 router.post('/', async (req, res) => {
   try {
-    const { name, card_type, color, goal_stamps, reward_desc } = req.body
+    const { name, card_type, color, goal_stamps, reward_desc, bizId: bodyBizId } = req.body
 
     if (!name || !card_type) {
       return res.status(400).json({ error: 'name and card_type required' })
@@ -41,10 +40,12 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Invalid card_type' })
     }
 
+    const bizId = (req.business.is_superadmin && bodyBizId) ? bodyBizId : req.business.id
+
     const { data, error } = await supabase
       .from('loyalty_cards')
       .insert({
-        business_id: req.business.id,
+        business_id: bizId,
         name,
         card_type,
         color: color || '#1D9E75',
@@ -62,17 +63,18 @@ router.post('/', async (req, res) => {
   }
 })
 
-// ─── PATCH /api/cards/:id ────────────────────────────────────
-// 카드 수정
+// âââ PATCH /api/cards/:id ââââââââââââââââââââââââââââââââââââ
+// ì¹´ë ìì  (superadminì body.bizId ë¡ ìì ê¶ ê²ì¦ ì°í ê°ë¥)
 router.patch('/:id', async (req, res) => {
   try {
-    const { name, color, goal_stamps, reward_desc, is_active } = req.body
+    const { name, color, goal_stamps, reward_desc, is_active, bizId: bodyBizId } = req.body
+    const bizId = (req.business.is_superadmin && bodyBizId) ? bodyBizId : req.business.id
 
     const { data, error } = await supabase
       .from('loyalty_cards')
       .update({ name, color, goal_stamps, reward_desc, is_active })
       .eq('id', req.params.id)
-      .eq('business_id', req.business.id)   // ownership check
+      .eq('business_id', bizId)
       .select()
       .single()
 
@@ -84,8 +86,8 @@ router.patch('/:id', async (req, res) => {
   }
 })
 
-// ─── GET /api/cards/:id/stats ────────────────────────────────
-// 카드별 통계
+// âââ GET /api/cards/:id/stats ââââââââââââââââââââââââââââââââ
+// ì¹´ëë³ íµê³
 router.get('/:id/stats', async (req, res) => {
   try {
     const cardId = req.params.id
