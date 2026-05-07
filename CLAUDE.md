@@ -358,6 +358,38 @@ git push origin main
 
 ## Change Log
 
+### 2026-05-07 (Session 12 — Superadmin Cards Selector + Auth Fix)
+
+**Backend (IdolShin/Nook) — 1 file updated:**
+
+- **`src/routes/auth.js`** — `SUPERADMIN_EMAIL` constant replaced with `SUPERADMIN_EMAILS` array (commit `7d2992d`)
+  - `const SUPERADMIN_EMAILS = ['woosang930414@gmail.com', 'woosang@nook.com']`
+  - `buildToken()` now uses `.includes()` check: `is_superadmin: biz.is_superadmin || SUPERADMIN_EMAILS.includes(biz.owner_email) || false`
+  - Google OAuth path also updated: `is_superadmin: SUPERADMIN_EMAILS.includes(email)`
+  - **Root cause fixed:** `woosang@nook.com` (test account) was not matching the old single Gmail-only constant, so JWT always had `is_superadmin: false`
+
+**Frontend (IdolShin/nook-admin) — 2 files updated:**
+
+- **`src/app/(admin)/register/page.tsx`** — Suspense boundary fix (commit `9b2f4c3`)
+  - `useSearchParams()` moved into non-default-exported `function RegisterPage()`
+  - New default export `function Page()` wraps it in `<Suspense fallback={null}>`
+  - Fixes Next.js 16 Turbopack prerender error: "useSearchParams() should be wrapped in a suspense boundary"
+
+- **`src/app/(admin)/cards/page.tsx`** — Superadmin business selector (commit `579472d`)
+  - New state: `businesses`, `selectedBiz`, `isSuperadmin`
+  - On mount: tries `api.listBusinesses()` — if it succeeds, sets `isSuperadmin: true` and filters out superadmin biz from dropdown
+  - Dropdown shows when `isSuperadmin: true`; selecting a business loads that business's cards via `api.cards({ bizId })`
+  - `NewCardModal` and `EditCardModal` both accept `bizId?: string` and pass it in the request body
+
+**Verified end-to-end:**
+- `woosang@nook.com` login JWT contains `is_superadmin: true` ✅
+- /cards page shows business selector dropdown (Nook Cafe, Audit Test Biz, 베이커리 샘플) ✅
+- Created "베이커리 스탬프 카드" for "베이커리 샘플" business (ID `226510b3-d4e1-4d5a-94c3-897c0194ae21`) via superadmin API ✅
+  - Card ID: `d16a5266-6595-4464-b172-65c87c8b40ff`
+  - `business_id` in response matches 베이커리 샘플 ID — bizId override confirmed working
+
+---
+
 ### 2026-05-07 (Session 11 — Register Page API + Git Worktree Fix)
 
 **Frontend (IdolShin/nook-admin) — 2 files updated:**
