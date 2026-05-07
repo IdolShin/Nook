@@ -475,3 +475,36 @@ document.execCommand('insertText', false, content); // returns true = success
 - Fixed "Failed to fetch" on login — added `NEXT_PUBLIC_API_URL` to Railway + CORS fix
 - Admin dashboard login fully working at `https://nook-admin-production.up.railway.app/auth`
 - CLAUDE.md fully rewritten with complete project status
+
+
+### 2026-05-06 (Session 6 — Scheduled Auto-Debug + Bug Fixes)
+
+**Scheduled Tasks created:**
+- **nook-daily-debug** (6:00 AM daily) — autonomous codebase scan: git log check, bug detection, CLAUDE.md review, writes `daily_debug_report.md`
+- **nook-morning-report** (7:30 AM daily) — presents findings from 6 AM scan in Korean to Woosang
+
+**Bug Fixes (nook-admin) — 3 files pushed:**
+
+- **`src/lib/api.ts`** — commit `0b18db0`
+  - Fixed `updateProfile` type: added `phone?: string` and `address?: string` fields (were missing, causing Settings page to drop those values on save)
+
+- **`src/app/(staff)/scan/page.tsx`** — commit `7e12180`
+  - Added `ScanMode = 'stamp' | 'coupon'` type
+  - Added `coupon_ok` discriminant to `AppState` discriminated union
+  - Added `scanMode` state + toggle button in top bar (Stamp / Coupon)
+  - Added coupon branch in `handleScanCode`: calls `api.redeemCoupon(barcode)` → shows COUPON OK screen with success animation
+  - Staff can now scan stamp cards AND redeem coupon barcodes from the same scanner page
+
+- **`src/app/(admin)/cards/page.tsx`** — commit `fd955a2`
+  - Added `EditCardModal` component — full form with name, goal_stamps, reward_desc, color picker, live card preview
+  - Modified `CardDetail` component to accept `onEdit` prop
+  - Added `handleEdit` in page — calls `api.updateCard(id, data)` and propagates changes upward
+  - Edit button now appears in CardDetail header (pencil icon)
+
+**Key technique (GitHub web editor):** CodeMirror 6 injection via:
+```js
+cmContent.focus();
+document.execCommand('selectAll', false, null);
+document.execCommand('insertText', false, content); // returns true = success
+```
+(Established in Session 5, reused here for all 3 file pushes)
