@@ -620,3 +620,44 @@ git push origin main
 ---
 
 ### 2026-
+
+
+---
+
+### 2026-05-09 (Session 15 — Fix Truncated Files + Railway Build Recovery)
+
+**Root cause:** Session 14's CM6 injection commits silently truncated three files, causing Railway builds to fail with "Parsing ecmascript source code failed". The last successful Railway build was the "feat: integrate SplashScreen into layout with Sora font" commit (all subsequent builds failed). Also `layout.tsx` had a `bottomNavH` used-before-declaration TypeScript error introduced by the Session 14 scroll-lock fix.
+
+**Frontend (IdolShin/nook-admin) — 4 files fixed:**
+
+- **`src/lib/api.ts`** — Restored ApiCoupon + ApiCouponPass interfaces (commit `fix: api.ts - restore complete ApiCoupon + ApiCouponPass interfaces`)
+  - File was truncated at line 305: `ApiCoupon { id: string;` (just spaces after)
+  - Fix: spliced correct tail content after the `id: string;` line via CM6 dispatch
+  - GitHub confirmed: 334 lines, 11641 bytes
+
+- **`src/components/SplashScreen.tsx`** — Restored closing JSX (commit `fix: SplashScreen.tsx - restore complete closing JSX (was truncated)`)
+  - File truncated at line 576 (just spaces), missing: `</div>` (nk-markwrap), nk-word/nk-lockup wordmark div, `</div>` (nk-stage), `</div>` (nk-splash), `</>`, `);`, `}`, `export default SplashScreen;`
+  - Fix: fetched original commit `22ef043` via GitHub API, found the nk-r2 span as common anchor point, spliced original tail onto current head
+  - GitHub confirmed: 599 lines
+
+- **`src/app/(admin)/register/page.tsx`** — Restored complete 391-line version (commit `fix: register/page.tsx - restore complete 391-line version with Suspense + API`)
+  - File truncated to 179 lines on GitHub (severely broken mid-JSX)
+  - Fix: fetched Session 12 commit `9b2f4c3` (Suspense boundary version — complete, has registerCustomer + handleRegister + Suspense wrapping)
+  - Confirmed: `hasRegisterCustomer: true`, `hasHandleRegister: true`, `hasSuspense: true`
+
+- **`src/app/(admin)/layout.tsx`** — Fixed `bottomNavH` used-before-declaration (commit `fix: layout.tsx - move bottomNavH declaration before useEffect`)
+  - TypeScript error: `Block-scoped variable 'bottomNavH' used before its declaration` at line 101
+  - Root cause: `const bottomNavH = ...` was declared at line 103 but used in `useEffect` deps array at line 101
+  - Fix: moved declaration to just before the scroll-lock `useEffect` block
+
+**Railway build result:**
+- All 4 commits → 4 failed builds (each fixed one more error)
+- Final "Update layout.tsx" commit → Deployment successful
+- Active build confirmed, site live at `https://nook-admin-production.up.railway.app/`
+
+**CM6 injection method refined:**
+- Used `document.querySelector('.cm-content')?.cmTile?.view` to find the CM6 EditorView
+- Always use `view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: newContent } })` to replace full document
+- For SplashScreen: fetched two versions via GitHub API, used common anchor (nk-r2 span) to splice correct tail onto current head
+
+**⚠️ CM6 injection lesson:** When using `view.dispatch({ changes })`, always verify the replace range spans the FULL document (`from: 0, to: doc.length`). If `to` is wrong, content gets appended instead of replaced, causing duplicate definitions.
