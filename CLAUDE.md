@@ -53,9 +53,9 @@ Woosang (operator/admin)
 âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 â                        Railway                           â
 â                                                          â
-â  âââââââââââââââââââââââ  ââââââââââââââââââââââââââââ â
+â  âââââââââââââââââââââââ  âââââââââââââââââââââââââââ â
 â  â   nook-backend       â  â   nook-admin (Next.js)   â â
-â  â   Node.js/Express    â  â   Ap App Router + proxy.ts  â â
+â  â   Node.js/Express    â  â   App Router + proxy.ts  â â
 â  â   :3001              â  â   :3000                  â â
 â  â                      â  â                          â â
 â  â  /api/auth           â  â  / (homepage)            â â
@@ -254,14 +254,14 @@ POST /api/permissions/staff-login       { email, password }  â  { token }  
 - [ ] **Scanner app** â wire coupon scan to real `POST /api/coupons/redeem`
 - [x] **Homepage** â Done (Session 7) â mobile responsive fix: `word-break: keep-all` on all Korean text, `overflow-x: hidden` at 980px, hero grid 55fr/45fr, h1 clamp
 - [x] **Dashboard charts** â Done (Session 7) â wired to real API: KPI stats, line chart (30d stamps/redeems), donut (card type mix), activity feed (recent signups)
-- [x] **New Card registratio bug** â Done (Session 8) â fixed 502 caused by truncated analytics.js on GitHub
+- [x] **New Card registration bug** â Done (Session 8) â fixed 502 caused by truncated analytics.js on GitHub
 - [x] **Customers page â Export CSV** â Done (Session 8) â Blob download with Name/Phone/Status/Stamps/Joined/LastVisit
 - [x] **Customers page â Send coupon** â Done (Session 8) â CouponPickerModal per-customer coupon dispatch
-- [x] **api.ts registerCustomer** ✅ Done (Session 11) — `registerCustomer()` added to api.ts, calls `POST /api/customers/register`
-- [x] **Register page API** ✅ Done (Session 11) — name field added, `handleRegister` wired to real backend, card_id from URL param
+- [x] **api.ts registerCustomer** â Done (Session 11) â `registerCustomer()` added to api.ts, calls `POST /api/customers/register`
+- [x] **Register page API** â Done (Session 11) â name field added, `handleRegister` wired to real backend, card_id from URL param
 
 ### ð¡ Medium Priority
-- [x] **Customer registration page** — ✅ Done (Session 11) — connected to real backend (`POST /api/customers/register`), name + phone fields, card_id from URL `?card_id=` param
+- [x] **Customer registration page** â â Done (Session 11) â connected to real backend (`POST /api/customers/register`), name + phone fields, card_id from URL `?card_id=` param
 - [ ] **Scanner app** â real camera QR/barcode scanning (jsQR library)
 - [ ] **Google Wallet pass status** â COMPLETED on redeem, EXPIRED on expiry
       (so customer sees updated state in their wallet)
@@ -358,80 +358,133 @@ git push origin main
 
 ## Change Log
 
-### 2026-05-07 (Session 12 — Superadmin Cards Selector + Auth Fix)
+### 2026-05-09 (Session 14 â SF Pro Font + Mobile Layout Polish + Git Index Fix)
 
-**Backend (IdolShin/Nook) — 1 file updated:**
+**Frontend (IdolShin/nook-admin) â 7 files updated:**
 
-- **`src/routes/auth.js`** — `SUPERADMIN_EMAIL` constant replaced with `SUPERADMIN_EMAILS` array (commit `7d2992d`)
+- **`src/app/globals.css`** â SF Pro font stack + font smoothing
+  - `--font-sans` updated to `-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Segoe UI", system-ui, sans-serif`
+  - Added `-webkit-font-smoothing: antialiased` + `font-feature-settings: "kern" 1, "liga" 1` to `body`
+  - Added `--font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace`
+  - Commit: `feat: SF Pro font + font smoothing`
+
+- **`src/lib/api.ts`** â Restored `updateProfile` phone/address fields + `registerCustomer`
+  - `updateProfile()` re-extended with `phone?: string` + `address?: string` params
+  - `registerCustomer()` confirmed present (added Session 11, restored after git index corruption)
+  - Commit: `feat: api.ts - restore updateProfile phone/address + registerCustomer`
+
+- **`src/app/(admin)/register/page.tsx`** â Reconnected to real backend
+  - `handleRegister` wired to `api.registerCustomer()`, name + phone fields, card_id from URL `?card_id=` param
+  - Commit: `feat: register page - reconnect to real backend`
+
+- **`src/components/layout/Sidebar.tsx`** â Tighter spacing + scroll-lock
+  - Nav item `minHeight: 34`, `padding: '6px 10px'` (was larger)
+  - Scrollable area: `overscrollBehavior: 'contain'` to prevent chain scrolling
+  - Safe-area padding on mobile, logout button, collapse toggle preserved
+  - Commit: `feat: sidebar - tighter spacing + scroll-lock`
+
+- **`src/components/layout/BottomNav.tsx`** â Safe-area + frosted glass
+  - `height: 'calc(56px + env(safe-area-inset-bottom, 0px))'`
+  - `paddingBottom/Left/Right: env(safe-area-inset-*)` for notched phones
+  - `background: 'rgba(255,255,255,0.96)'` + `backdropFilter: 'blur(12px)'`
+  - Commit: `feat: bottom nav - safe-area + frosted glass`
+
+- **`src/components/layout/Topbar.tsx`** â Mobile safe-area + blur
+  - Mobile header: `paddingTop: 'env(safe-area-inset-top, 0px)'`, `height: 'calc(52px + env(safe-area-inset-top, 0px))'`
+  - `background: 'rgba(255,255,255,0.96)'` + `backdropFilter/WebkitBackdropFilter: 'blur(12px)'`
+  - `position: 'sticky', top: 0, zIndex: 10` for scroll behavior
+  - Commit: `feat: topbar - mobile safe-area + blur`
+
+- **`src/app/(admin)/layout.tsx`** â Scroll-lock fix + main content freeze
+  - Drawer open: `document.body.style.overflow = 'hidden'` + `admin-main` inline style `overflow:hidden`
+  - Drawer closed: restores `overflow:auto` on `admin-main`
+  - `bottomNavH`: `calc(56px + env(safe-area-inset-bottom, 0px))` when mobile, `0px` on desktop
+  - Commit: `feat: layout - scroll-lock fix + main content freeze`
+
+**Git index corruption fix:**
+- Windows-side git had stale `index.lock` + ghost deletions (files tracked as deleted in index despite existing on disk)
+- All 7 files committed individually via GitHub CM6 EditorView injection (browser MCP) â bypassed corrupted local git entirely
+- Injection method: base64 chunked (3996-char pieces) â `window._C` array â `atob()` â CM6 `view.dispatch({ changes })` â commit dialog automation
+
+---
+
+### 2026-05-07 (Session 13 â Dashboard Encoding Bug Fix)
+
+**Frontend (IdolShin/nook-admin) â 1 file fixed:**
+
+- **`src/app/(admin)/dashboard/page.tsx`** â UTF-8 encoding bugs + file truncation fixed (commit `3728170`)
+  - **Root cause**: Session 7's GitHub web editor `execCommand('insertText')` injection had two problems:
+    1. Literal Unicode chars `Â·` (U+00B7) and `â` (U+2014) were embedded as raw UTF-8 bytes in the source, causing double-encoding artifacts at build time â garbled characters rendered in the dashboard UI
+    2. File was truncated at line 327 (`background: p.status === 'dra`) â the last 14 lines of closing JSX were missing
+  - **Fix applied**:
+    - All literal `Â·` â `Â·` JS escape sequences (lines 173, 279, 332)
+    - All literal `â` â `â` JS escape sequences (lines 22, 28, 34, 40, 238)
+    - Restored missing 14 lines of closing JSX (status badge span, bizÂ·whenÂ·reach line, closing `</div>`Ã4, `</Card>`, `</div>`, `);`, `}`)
+  - **Method**: Python binary base64 chunked injection (11Ã1900-char pieces â assembled `window._D` â `atob()` decode â `execCommand('insertText')`) to bypass GitHub editor size limits
+  - Commit message: `fix: dashboard - fix encoding bugs (Â·/â) + restore truncated file end`
+
+**Verified:**
+- File decoded to 14886 bytes, 341 lines, all content checks passed (HAS_U00B7, HAS_U2014, HAS_USE_CLIENT, HAS_EXPORT, ENDS_CORRECTLY) â
+- Railway auto-deploy triggered from `main` branch push â
+
+---
+
+### 2026-05-07 (Session 12 â Superadmin Cards Selector + Auth Fix)
+
+**Backend (IdolShin/Nook) â 1 file updated:**
+
+- **`src/routes/auth.js`** â `SUPERADMIN_EMAIL` constant replaced with `SUPERADMIN_EMAILS` array (commit `7d2992d`)
   - `const SUPERADMIN_EMAILS = ['woosang930414@gmail.com', 'woosang@nook.com']`
   - `buildToken()` now uses `.includes()` check: `is_superadmin: biz.is_superadmin || SUPERADMIN_EMAILS.includes(biz.owner_email) || false`
   - Google OAuth path also updated: `is_superadmin: SUPERADMIN_EMAILS.includes(email)`
   - **Root cause fixed:** `woosang@nook.com` (test account) was not matching the old single Gmail-only constant, so JWT always had `is_superadmin: false`
 
-**Frontend (IdolShin/nook-admin) — 2 files updated:**
+**Frontend (IdolShin/nook-admin) â 2 files updated:**
 
-- **`src/app/(admin)/register/page.tsx`** — Suspense boundary fix (commit `9b2f4c3`)
+- **`src/app/(admin)/register/page.tsx`** â Suspense boundary fix (commit `9b2f4c3`)
   - `useSearchParams()` moved into non-default-exported `function RegisterPage()`
   - New default export `function Page()` wraps it in `<Suspense fallback={null}>`
   - Fixes Next.js 16 Turbopack prerender error: "useSearchParams() should be wrapped in a suspense boundary"
 
-- **`src/app/(admin)/cards/page.tsx`** — Superadmin business selector (commit `579472d`)
+- **`src/app/(admin)/cards/page.tsx`** â Superadmin business selector (commit `579472d`)
   - New state: `businesses`, `selectedBiz`, `isSuperadmin`
-  - On mount: tries `api.listBusinesses()` — if it succeeds, sets `isSuperadmin: true` and filters out superadmin biz from dropdown
+  - On mount: tries `api.listBusinesses()` â if it succeeds, sets `isSuperadmin: true` and filters out superadmin biz from dropdown
   - Dropdown shows when `isSuperadmin: true`; selecting a business loads that business's cards via `api.cards({ bizId })`
   - `NewCardModal` and `EditCardModal` both accept `bizId?: string` and pass it in the request body
 
 **Verified end-to-end:**
-- `woosang@nook.com` login JWT contains `is_superadmin: true` ✅
-- /cards page shows business selector dropdown (Nook Cafe, Audit Test Biz, 베이커리 샘플) ✅
-- Created "베이커리 스탬프 카드" for "베이커리 샘플" business (ID `226510b3-d4e1-4d5a-94c3-897c0194ae21`) via superadmin API ✅
+- `woosang@nook.com` login â JWT contains `is_superadmin: true` â
+- `/cards` page shows business selector dropdown (Nook Cafe, Audit Test Biz, ë² ì´ì»¤ë¦¬ ìí) â
+- Created "ë² ì´ì»¤ë¦¬ ì¤í¬í ì¹´ë" for "ë² ì´ì»¤ë¦¬ ìí" business (ID `226510b3-d4e1-4d5a-94c3-897c0194ae21`) via superadmin API â
   - Card ID: `d16a5266-6595-4464-b172-65c87c8b40ff`
-  - `business_id` in response matches 베이커리 샘플 ID — bizId override confirmed working
+  - `business_id` in response matches ë² ì´ì»¤ë¦¬ ìí's ID â bizId override confirmed working
 
 ---
 
-### 2026-05-07 (Session 11 — Register Page API + Git Worktree Fix)
+### 2026-05-07 (Session 11 â Register Page API + Git Worktree Fix)
 
-**Frontend (IdolShin/nook-admin) — 2 files updated:**
+**Frontend (IdolShin/nook-admin) â 2 files updated:**
 
-- **`src/lib/api.ts`** — Added `registerCustomer()` method (commits `7f81b02` → fixed `2a7b7d2`)
-  - `registerCustomer(data: { card_id, name, phone, consent_push?, consent_points? }) → Promise<{ customer: ApiCustomer }>`
+- **`src/lib/api.ts`** â Added `registerCustomer()` method (commits `7f81b02` â fixed `2a7b7d2`)
+  - `registerCustomer(data: { card_id, name, phone, consent_push?, consent_points? }) â Promise<{ customer: ApiCustomer }>`
   - Calls `POST /api/customers/register` (public endpoint, no auth header)
   - `consent_push` + `consent_points` default to `true`
   - Error parsed from `res.json().error` field
 
-- **`src/app/(admin)/register/page.tsx`** — 380 lines (was 344), commit `48ad108`
-  - Added `import { useSearchParams } from 'next/navigation'` + `import { api } from '@/lib/api'`
-  - **`Step1` rewritten**: now accepts controlled `name`/`phone` props + `onNameChange`/`onPhoneChange` callbacks + `loading`/`error` props
+- **`src/app/(admin)/register/page.tsx`** â 380 lines (was 344), commit `48ad108`
+  - Added `import { useSearchParams } from 'next/navigation'` + `import { api } from '@/lib/api`
+  - **`Step1` rewritten**: now accepts controlled `name`/`phone` props + `onNameChange`/`onXhoneChange` callbacks + `loading`/`error` props
     - Added Name input field above phone input
     - Error banner shown when `error` prop is set
     - Button text changes to `'Registering...'` when loading, `disabled` during loading
-  - **`RegisterPage` rewritten**: added `useSearchParams` to read `?card_id=` URL param, state for `name`/`phone`/`loading`/`regError`, `async handleRegister()` that calls `api.registerCustomer()`, inline step rendering replacing the old `STEPS[step]` pattern
+  - **`RegisterPage` rewritten**: added `useSearchParams` to read `?card_id=` URL param, state for `name`/`phone`/`loading`/`regError`, `async handleRegister()` that calls `api.registerCustomer()`, `advance` helper, inline step rendering (step 0â4 as `{step === N && <StepN ... />}`) replacing the old `STEPS[step]` pattern
   - Step 1 description panel updated to reflect real API call behavior
 
-**Backend (IdolShin/Nook) — no code changes:**
+**Backend (IdolShin/Nook) â code changes:**
 
-- **Git worktree fixed** (no commit needed): `.claude/worktrees/naughty-bhaskara-9f4139/.git` had Windows absolute path in `gitdir`. Overwrote with relative path `gitdir: ../../../.git/worktrees/naughty-bhaskara-9f4139`. `git status` now works normally.
-- **`src/routes/analytics.js`** — confirmed intact (200 lines) via Read tool. Linux sandbox mount was serving stale 172-line cached version — false alarm.
-- **`CLAUDE.md`** — Session 8 changelog pushed via CodeMirror dispatch (commit `706c4fa`)
-
----
-
-### 2026-05-07 (Session 11 — Restore Truncated nook-admin Files)
-
-**Root Cause:** Multiple `nook-admin` files were truncated in sessions 7-8 by `document.execCommand('insertText', false, content)` which silently truncates content when the file is larger than ~5000 characters. Files were committed as broken truncated versions.
-
-**Frontend (IdolShin/nook-admin) — 4 files fully restored:**
-
-- **`src/app/(marketing)/marketing.css`** — Restored complete file (commit `b186a2c`)
-- **`src/app/(admin)/dashboard/page.tsx`** — Restored complete 326-line file (commit `3dc0d06`)
-- **`src/lib/api.ts`** — Restored complete file with all API methods (commit `8bfb4fa`)
-- **`src/app/(admin)/cards/page.tsx`** — Restored from 612-line truncated version to 1029-line complete file (commit `3eb9ae7`)
-  - Contains full: TypePill, StatusPill, FilterDropdown, NewCardModal, EditCardModal, StampGrid, CardDesignPreview, WalletCardPreview, RegistrationQRCard, CardDesigner, CardTile, CardsTable, CardDetail, CardsPage
-
-**Method:** Base64 chunked injection via `atob()` + CodeMirror EditorView dispatch API. Files split into ~6KB base64 chunks, accumulated in `window._inject`, then dispatched via `view.dispatch({ changes: { from: 0, to: doc.length, insert: content } })`.
-
-**Note:** Box-drawing/emoji characters in comments show as garbled (UTF-8 multi-byte encoding artifact from atob() byte-level decoding) — TypeScript compiles fine since they are in comments only.
+- **Git worktree fixed** (no commit needed): `.claude/worktrees/naughty-bhaskara-9f4139/.git` had `gitdir: C:/Users/woosa/Desktop/Nook/.git/worktrees/...` (Windows absolute path). Overwrote with relative path `gitdir: ../../../.git/worktrees/naughty-bhaskara-9f4139`. `git status` now works normally.
+- **`src/routes/analytics.js`** â confirmed intact (200 lines, complete) via Read tool. Linux sandbox mount was serving a stale 172-line cached version â false alarm.
+- **`CLAUDE.md`** â Session 8 changelog pushed via CodeMirror dispatch (commit `706c4fa`)
 
 ---
 
@@ -497,11 +550,11 @@ git push origin main
 
 ### 2026-05-07 (Session 8 â ì ì¹´ë ë±ë¡ ë²ê·¸ ìì  / Backend 502 Fix)
 
-**Root Cause:** `src/routes/analytics.js`ê° ì´ì  ì¸ììì GitHub ì¹ ìëí°ì `document.execCommand('insertText')` ì£¼ì ë°©ìì¼ë¡ ì»¤ë°ë  ë íì¼ì´ ì¤ê°ì ìë¦¼ (6008ììì truncate). `res.json()`, catch ë¸ë¡, `module.exports = router`ê° ëë½ëì´ Node.jsê° `SyntaxError: Unexpected end of input`ì ë°ììí¤ë©° ìë² í¬ëì â ì ì²´ API 502 Bad Gateway.
+**Root Cause:** `src/routes/analytics.js`ê° ì´ì  ì¸ììì GitHub ì¹ ìëí°ì `document.execCommand('insertText')` ì£¼ì ë°©ìì¼ë¡ ì½ë°ë  ë íì¼ì´ ì¤ê°ì ìë¦¼ (6008ììì truncate). `res.json()`, catch ë¸ë¡, `module.exports = router`ê° ëë½ëì´ Node.jsê° `SyntaxError: Unexpected end of input`ì ë°ììí¤ë©° ìë² í¬ëì â ì ì²´ API 502 Bad Gateway.
 
 **Backend (IdolShin/Nook) â 1 file fixed:**
 
-- **`src/routes/analytics.js`** â ìì í íì¼ë¡ ì¬ì»¤ë° (148ì¤, 5.25KB)
+- **`src/routes/analytics.js`** â ìì í íì¼ë¡ ì¬ì½ë° (148ì¤, 5.25KB)
   - Unicode box-drawing chars (`â`) ì ê±° (ì¸ì½ë© ë¬¸ì  ë°©ì§)
   - Supabase ì²´ì¸ ë¨ì¼ ë¼ì¸ì¼ë¡ ìì¶ (íì¼ í¬ê¸° ì¶ì)
   - `res.json({...})`, catch block, `module.exports = router` ëª¨ë í¬í¨ íì¸
@@ -512,10 +565,58 @@ git push origin main
 - New Card ë±ë¡ â "Bug Fix Test Card" ìì± ì±ê³µ, ëª©ë¡ì ì¦ì ë°ì â
 - ëìë³´ë ë¡ê·¸ì¸ ì ì â
 
-**â ï¸ execCommand ì£¼ì ë°©ì ê²½ê³ :** GitHub ì¹ ìëí°ìì `document.execCommand('insertText', false, content)` ë°©ìì¼ë¡ ê¸´ íì¼(>5000ì)ì ì£¼ìíë©´ íì¼ì´ truncateë  ì ìì. í¥í ê¸´ íì¼ì Git CLI ëë GitHub APIë¥¼ íµí´ ì§ì  ì»¤ë° ê¶ì¥.
+**â ï¸ execCommand ì£¼ì ë°©ì ê²½ê³ :** GitHub ì¹ ìëí°ìì `document.execCommand('insertText', false, content)` ë°©ìì¼ë¡ ê¸´ íì¼(>5000ì)ì ì£¼ìíë©´ íì¼ì´ truncateë  ì ìì. í¥í ê¸´ íì¼ì Git CLI ëë GitHub APIë¥¼ íµí´ ì§ì  ì½ë° ê¶ì¥.
 
 ---
 
 ### 2026-05-06 (Session 7 cont. â Dashboard Real Data + api.ts Types)
 
-**Backend (
+**Backend (IdolShin/Nook) â 1 file updated:**
+
+- **`src/routes/analytics.js`** â Extended response with two new 30-element arrays:
+  - `stamps_daily_30d`: daily stamp counts for last 30 days (index 0 = 30 days ago, index 29 = today)
+  - `redemptions_daily_30d`: daily redemption counts for last 30 days
+  - Commit: `feat: analytics - add stamps_daily_30d + redemptions_daily_30d`
+
+**Frontend (IdolShin/nook-admin) â 2 files updated:**
+
+- **`src/lib/api.ts`** â Added `stamps_daily_30d: number[]` + `redemptions_daily_30d: number[]` to `analytics()` return type
+  - Commit: `feat: api.ts - add stamps_daily_30d + redemptions_daily_30d types`
+
+- **`src/app/(admin)/dashboard/page.tsx`** â Complete rewrite (326 lines), all mock data replaced with real API:
+  - Added `CARD_TYPE_COLORS` map: stamp=#1D9E75, coupon=#3B6BCC, membership=#C53A6B, cashback=#C26B1F
+  - Added `timeAgo(isoDate)` helper: mins/hours/days relative timestamp
+  - State: `stampsTrend`, `redeemsTrend`, `cardTypeMix`, `recentActivity`
+  - `api.stats()` â KPI values (total customers, active cards, stamps, redemptions)
+  - `api.analytics()` â `stamps_daily_30d`/`redemptions_daily_30d` â NookLineChart (30d trend)
+  - `api.cards()` â groups active cards by `card_type` â NookDonutChart (live card mix)
+  - `api.customers()` â sorted desc by `created_at` â top 8 â activity feed (signup type)
+  - Activity feed: 2-column grid on desktop, shows real customer names + `timeAgo()` timestamps
+  - Fallback: zeros array (30) for line chart, `[{label:'Stamp',value:1}]` for donut when no data
+  - Removed: NookStackedBar, "Top businesses" leaderboard (required multi-business mock data)
+  - Commit: `feat: dashboard - wire charts to real API data`
+
+---
+
+### 2026-05-06 (Session 7 â Homepage Mobile Responsive Fix + CLAUDE.md Push)
+
+**Frontend (nook-admin) â 1 file updated, committed `b9ef4dc`:**
+
+- **`src/app/(marketing)/marketing.css`** â Korean mobile responsive overhaul
+  - `word-break: keep-all` added to all Korean-facing text elements:
+    `.h1`, `.h1-sub`, `.section-eyebrow`, `.section-title`, `.section-sub`,
+    `.reason h3`, `.reason p`, `.journey-caption h3`, `.journey-caption p`,
+    `.faq-item summary`, `.cta-banner h2`
+  - `overflow-wrap: break-word` added to `.h1`, `.section-title`, `.cta-banner h2`
+  - 980px tablet breakpoint: added `html, body { overflow-x: hidden; max-width: 100vw; }`
+  - 980px: `.h1` reduced from 42px â 38px; `.phones` height 460â420px
+  - 980px: `.hero-grid` changed from `1fr 1fr` to `55fr 45fr; gap: 32px`
+  - 767px mobile: `.h1` â `clamp(28px, 7.5vw, 40px)`, `.h1-sub` â `clamp(14px, 4vw, 17px)`
+  - Commit message: `fix: homepage mobile responsive - word-break keep-all, 980px overflow fix`
+
+**Backend (IdolShin/Nook) â 1 file pushed, commit `21b5075`:**
+- **`CLAUDE.md`** â Session 6 changelog recorded
+
+---
+
+### 2026-
