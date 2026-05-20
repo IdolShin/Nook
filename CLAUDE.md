@@ -230,6 +230,8 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 - **`/api/analytics` route** — extended: `stamps_daily_30d` + `redemptions_daily_30d` 30-element arrays added to response
 - **Customers page** — Export CSV (Blob download) + CouponPickerModal (send coupon to individual customer via `api.issueCoupon`)
 - **Customers page sort** — sortable columns (Customer/Status/Stamps/Last visit), SortIcon component (ArrowUp/ArrowDown/ChevronsUpDown), fixed empty-state for "no search results" vs "no customers"
+- **Google Review reward system** — `src/routes/reviews.js`: GET/PATCH `/api/reviews/config`, GET `/api/reviews/public/:bizId`, POST `/api/reviews/initiate`; `review_rewards` table with `days_to_wait` delay; daily 9am scheduler processes pending → stamp or coupon issued + push notification
+- **Jest test suite** — `tests/` folder: auth (7), cards (6), customers (5), reviews (8) = 26 total; Supabase mock; `src/createApp.js` factory; `npm test` / `npm run test:ci`
 
 ---
 
@@ -272,7 +274,7 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 ### 🟢 Later / Nice to Have
 - [ ] **Apple Wallet** — $99/yr Apple Developer account needed
 - [ ] **Stripe integration** — subscription billing per plan
-- [ ] **Google Review coupon** — customer leaves review → auto-issue coupon
+- [x] **Google Review coupon** ✅ Done (Session 19) — customer leaves review → `days_to_wait` 후 자동 스탬프/쿠폰 지급, `review_rewards` 테이블, 매일 9am 스케줄러 처리
 - [ ] **SMS notifications** — Twilio or similar
 - [ ] **Multi-location business support**
 - [ ] **White-label option** for Premium plan
@@ -357,6 +359,20 @@ git push origin main
 ---
 
 ## Change Log
+
+### 2026-05-19 (Session 19 — Jest 테스트 수트 + Google Review 기록 정리)
+
+- **`src/createApp.js`** — NEW: Express 앱 팩토리 (index.js에서 서버 시작 코드 분리), 모든 라우트 등록, `app.listen()` 없이 export → 테스트 가능
+- **`src/routes/reviews.js`** — Google Review 리워드 API 정식 등록: `GET/PATCH /api/reviews/config`, `GET /api/reviews/public/:bizId`, `POST /api/reviews/initiate`; `days_to_wait` 설정, 중복 방지
+- **`tests/__mocks__/supabase.js`** — 체이너블 Supabase 목 (queue 시스템, 실제 DB 없이 테스트)
+- **`tests/setup.js`** — `setupFilesAfterEnv`로 JWT_SECRET 등 테스트 env 설정
+- **`tests/auth.test.js`** / **`cards.test.js`** / **`customers.test.js`** / **`reviews.test.js`** — 총 26개 케이스
+- **`package.json`** — jest devDependency, `testPathIgnorePatterns: ['/.claude/']`
+- **`index.js` 확인** — 246줄 완전한 상태 (reviews 라우트 + review rewards 스케줄러 포함)
+
+**Verified:** `run_tests.bat` 실행 → 26개 테스트 전부 통과 ✅
+
+---
 
 ### 2026-05-09 (Session 17 — UI Polish: Color Scheme, Push Page, Sidebar, Font, Loading)
 
