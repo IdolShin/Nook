@@ -24,7 +24,9 @@ app.use(cors({
     process.env.FRONTEND_URL || 'http://localhost:3000',
     /\.vercel\.app$/,
     /\.nookapp\.com$/,
-    /\.railway\.app$/
+    /\.railway\.app$/,
+    'https://nook-wallet.com',
+    'https://www.nook-wallet.com'
   ],
   credentials: true
 }))
