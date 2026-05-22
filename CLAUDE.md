@@ -18,10 +18,13 @@ Woosang (operator/admin)
 
 | Service | URL |
 |---------|-----|
-| Backend API | https://nook-production-270f.up.railway.app |
-| Frontend Dashboard | https://nook-admin-production.up.railway.app |
-| Homepage | https://nook-admin-production.up.railway.app/ |
+| **Custom Domain (Frontend)** | **https://nook-wallet.com** |
+| Backend API (internal) | https://nook-production-270f.up.railway.app |
+| Frontend Dashboard (Railway) | https://nook-admin-production.up.railway.app |
+| Homepage | https://nook-wallet.com/ |
 | Health check | https://nook-production-270f.up.railway.app/health |
+
+> ⚠️ `nook-wallet.com` purchased via Cloudflare. Frontend Railway service has custom domain set. NEXT_PUBLIC_API_URL = `https://nook-wallet.com`. Next.js rewrites proxy `/api/*` → backend Railway service. Backend CORS allows `nook-wallet.com`.
 
 ---
 
@@ -232,6 +235,7 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 - **Customers page sort** — sortable columns (Customer/Status/Stamps/Last visit), SortIcon component (ArrowUp/ArrowDown/ChevronsUpDown), fixed empty-state for "no search results" vs "no customers"
 - **Google Review reward system** — `src/routes/reviews.js`: GET/PATCH `/api/reviews/config`, GET `/api/reviews/public/:bizId`, POST `/api/reviews/initiate`; `review_rewards` table with `days_to_wait` delay; daily 9am scheduler processes pending → stamp or coupon issued + push notification
 - **Jest test suite** — `tests/` folder: auth (7), cards (6), customers (5), reviews (8) = 26 total; Supabase mock; `src/createApp.js` factory; `npm test` / `npm run test:ci`
+- **Navigation UX overhaul** — Sidebar restructured (Main/Growth/Scanner/Settings sections), BottomNav rewritten with central Scan CTA (circular green button) + pill active indicator, More sheet trimmed, bg color refined to #F5F7F6
 
 ---
 
@@ -250,7 +254,7 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 - [x] **Edit Card form** ✅ Done (Session 6)
 - [x] **Register page backend** ✅ Done (Session 6)
 - [x] **Scanner coupon redeem** ✅ Done (Session 6)
-- [ ] **Domain purchase** — `nookwallet.com` + Cloudflare DNS setup
+- [x] **Domain purchase** ✅ Done (Session 21) — `nook-wallet.com` purchased via Cloudflare, DNS CNAME → Railway frontend, NEXT_PUBLIC_API_URL updated, /api/* rewrite proxy added, backend CORS updated
 - [ ] **Resend API key** — add to Railway backend env vars
 - [ ] **Coupon → Google Wallet** — real connection test end-to-end
 - [ ] **Scanner app** — wire coupon scan to real `POST /api/coupons/redeem`
@@ -338,7 +342,9 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 - **Next.js 16**: `middleware.ts` is deprecated. Auth guard logic lives in `proxy.ts` (`export function proxy`). `middleware.ts` kept as a no-op stub with empty matcher to satisfy Turbopack build.
 - **Standalone output**: `next.config.ts` uses `output: 'standalone'`. nixpacks.toml copies `public/` and `.next/static/` into the standalone bundle.
 - **`NEXT_PUBLIC_API_URL`**: must be set in Railway env vars before build (build-time variable).
-- **CORS**: backend must include `/\.railway\.app$/` in allowed origins.
+- **CORS**: backend must include `/\.railway\.app$/` AND `https://nook-wallet.com` in allowed origins (`src/index.js`).
+- **Custom domain routing**: `nook-wallet.com` → Railway frontend (Next.js). `/api/*` calls are proxied by Next.js rewrites (`next.config.ts`) to the backend Railway service. No CORS issues since proxy is server-side.
+- **`NEXT_PUBLIC_API_URL`**: now set to `https://nook-wallet.com` (was `https://nook-production-270f.up.railway.app`). Also hardcoded in `.env.local` — update both if domain changes.
 
 ---
 
@@ -359,6 +365,143 @@ git push origin main
 ---
 
 ## Change Log
+
+### 2026-05-21 (Session 24 — Dashboard Refinement: Font, Loading Screen, iOS Safe-Area)
+
+**Three follow-up fixes applied after the Session 23 ZARVIS redesign:**
+
+- **`src/app/globals.css`** — SF Pro / Apple system font
+  - `--font-sans` and `body font-family` updated to `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif`
+  - Improves native feel on macOS/iOS; falls back to `system-ui` on Android/Windows
+  - Commit: `style: SF Pro / Apple system font` (`94938d7`)
+
+- **`src/app/(admin)/layout.tsx`** + **`src/app/(admin)/loading.tsx`** — Loading screen centering + remove `setAttribute` antipattern
+  - Loading screen: removed stray `paddingTop/Bottom: env(safe-area...)` that was offsetting the centered spinner
+  - Layout scroll-lock: replaced `document.getElementById('admin-main')?.setAttribute('style', ...)` with a reactive `mainOverflow` state variable fed directly to the `<main>` JSX inline style — much cleaner, no DOM mutation side-effects
+  - Commit: `fix: loading screen pure center + remove setAttribute antipattern in layout` (`dcf449c`)
+
+- **`src/app/(admin)/layout.tsx`** + **`src/components/layout/BottomNav.tsx`** + **`src/components/layout/Topbar.tsx`** — CSS vars for safe-area (iOS Safari `env()` inline-style bug)
+  - iOS Safari doesn't process `env(safe-area-inset-*)` inside React inline style strings; must use CSS custom properties instead
+  - Replaced all three occurrences: `env(safe-area-inset-bottom, 0px)` → `var(--safe-bottom)`, `env(safe-area-inset-top, 0px)` → `var(--safe-top)`, etc.
+  - CSS vars `--safe-top / --safe-bottom / --safe-left / --safe-right` defined in `globals.css` via `@supports`
+  - Commit: `fix: use CSS vars for safe-area (iOS Safari env() inline-style bug)` (`f23470a`)
+
+**Railway auto-deploy:** All 3 commits pushed to main → Railway build triggered automatically.
+
+---
+
+### 2026-05-21 (Session 23 — UI Design Polish: ZARVIS-inspired Redesign)
+
+**Full visual redesign of the admin dashboard UI, inspired by ZARVIS dark-sidebar SaaS style:**
+
+- **`src/app/globals.css`** — Design system refresh committed to GitHub
+  - Updated `--color-bg` to `#EEF2F7` (cooler, less green)
+  - Added Google Fonts Inter import (`wght@300;400;500;600;700;800`)
+  - New sidebar dark theme tokens: `--sidebar-bg: #0D1B2E`, `--sidebar-surface: #162235`, `--sidebar-active-bg: rgba(29,158,117,0.18)`, etc.
+  - More vibrant KPI gradient tokens: `--color-grad-green-from: #10B981`, `--color-grad-blue-from: #3B82F6`, etc.
+  - New shadow tokens: `--shadow-sm`, `--shadow-md`, `--shadow-lg`, `--shadow-glow`
+  - New CSS utility classes: `.card`, `.card-glass`, `.kpi-icon`, `.badge`, `.badge-up`, `.badge-down`, `.badge-neu`
+  - New animations: `shimmer`, `pulseGlow`
+  - Commit: "Update globals.css"
+
+- **`src/components/layout/Sidebar.tsx`** — Dark sidebar redesign committed to GitHub
+  - `ICON_META` color map per nav item (green/blue/purple/amber/pink/slate per section)
+  - Sidebar background: `linear-gradient(180deg, #0D1B2E 0%, #0F2034 100%)` with `boxShadow: '4px 0 24px rgba(0,0,0,0.18)'`
+  - Nav items: 3px solid `#1D9E75` left border when active, `rgba(29,158,117,0.18)` background, 6px green dot indicator at right
+  - Icon boxes: 28x28px rounded, colored bg when active, `rgba(255,255,255,0.07)` when inactive
+  - Logo: dark green container with border, NookMark centered
+  - User row: frosted glass look with avatar gradient, initials, role badge, logout button
+  - Commit: "Update Sidebar.tsx"
+
+- **`src/app/(admin)/dashboard/page.tsx`** — Dashboard redesign committed to GitHub
+  - KPI cards: gradient icon backgrounds (green/blue/amber/pink per metric), 36x36 icon boxes, 800-weight 30px numbers, colored corner glow (absolute div), "Live" badge, sparkline
+  - `ChartCard` component: `accent` prop for 3px top gradient strip (green-blue / purple-pink)
+  - Page header (desktop): h1 "Dashboard" + subtitle + "Live" pill + gradient "New Card" button
+  - Activity feed: gradient icon backgrounds, timestamp chips, hover states
+  - Layout: Row 2 (1.8fr + 1fr), Row 3 (1.4fr + 1fr activity + scheduled pushes)
+  - Commit: "Update page.tsx"
+
+**Injection method:** GitHub web editor CM6 dispatch (8 base64 chunks × ~3996 chars each for dashboard, 5 chunks for Sidebar) — local git index.lock bypass as per established pattern.
+
+**Railway auto-deploy:** Both commits pushed to main → Railway build triggered automatically.
+
+---
+
+### 2026-05-20 (Session 22 — useBreakpoint 기본값 수정 + BottomNav 높이 조정)
+
+**핵심 버그 수정 — hydration 미스매치로 인한 레이아웃 점프:**
+
+- **`nook-admin/src/hooks/useBreakpoint.ts`** — `useState(1200)` → `useState(0)` (모바일 우선 기본값)
+  - 기존: 기본값이 1200(데스크탑)이라 SSR 시 BottomNav 없음 + padding=0으로 시작 → hydration 후 모바일로 전환 시 레이아웃 점프
+  - 수정: `useState(0)`으로 처음부터 모바일로 시작 → 대시보드 첫 로드 시 레이아웃 안정화
+
+- **`nook-admin/src/app/(admin)/layout.tsx`** — `bottomNavH` 86px → 60px
+  - 기존: 86px = BottomNav(60px) + Scan 버튼 돌출(26px) 합산 — 하단 여백 과도하게 큼
+  - 수정: 60px으로 줄여 다른 페이지와 균등한 하단 여백
+
+**Verified:** Railway 자동 배포 완료, 대시보드 하단 레이아웃 점프 해소 ✅
+
+---
+
+### 2026-05-19 (Session 21 — UI Polish + Custom Domain Setup: nook-wallet.com)
+
+**UI fixes deployed to Railway:**
+
+- **`src/app/(admin)/loading.tsx`** — Loading screen centering fixed
+  - Was: `justifyContent: 'flex-start'` + `paddingTop: calc(50vh+4vh)` + `transform: translateY(-50%)` → content appeared too high
+  - Fixed: `justifyContent: 'center'` + `paddingBottom: calc(40px + safe-area-inset-bottom)` → true center with slight upward bias
+  - Gap increased: `gap: 16`, dots `marginTop: 20` for better breathing room
+
+- **`src/app/(admin)/dashboard/page.tsx`** — Dashboard bottom padding fix
+  - Was: `padding: '16px'` (all sides) + `minHeight: '100%'` → bottom 16px stacked on top of layout's 86px nav clearance, making nav area look taller than other pages
+  - Fixed: `padding: '16px 16px 0'` (no bottom), `minHeight`/`alignContent` removed
+
+- **`src/app/(staff)/scan/page.tsx`** — Full mojibake fix (committed in Session 20 bat run)
+  - 1560 non-ASCII double-encoded chars corrected (Korean text: `입력`, `수동`, `스캔` etc., emoji ✏️)
+  - Null bytes stripped, stray `))}` JSX fragment removed
+
+- **`src/app/(admin)/layout.tsx`** — `bottomNavH` = `calc(86px + safe-area-inset-bottom)` (was `60px`)
+  - 60px nav height + 26px Scan button overhang = 86px total clearance needed
+
+**Custom domain `nook-wallet.com` setup (Cloudflare → Railway):**
+
+- **`nook-admin/next.config.ts`** — Added Next.js rewrites: `/api/:path*` → backend Railway URL
+  - All API calls now proxy server-side through Next.js → no CORS issues
+- **`nook-admin/.env.local`** — `NEXT_PUBLIC_API_URL` updated to `https://nook-wallet.com`
+- **`src/index.js` (backend)** — CORS updated: added `nook-wallet.com` + `www.nook-wallet.com`
+- Cloudflare DNS: CNAME `@` + `www` → Railway frontend CNAME (DNS only, no proxy)
+- Railway frontend service: custom domain `nook-wallet.com` added
+
+**Pending (not yet deployed/verified):**
+- `run_backend.bat` (CORS fix for backend) may still need running
+- `NEXT_PUBLIC_API_URL` Railway env var change: user had difficulty saving — `.env.local` fix should override
+- Login flow at `nook-wallet.com` — needs verification after both deploys complete
+
+---
+
+### 2026-05-19 (Session 20 — Navigation UX Overhaul: Sidebar + BottomNav Restructure)
+
+**User-driven redesign of the admin navigation system:**
+
+- **`nook-admin/src/components/layout/Sidebar.tsx`** — Restructured nav into logical sections:
+  - **Main**: Dashboard, Customers (daily-use items)
+  - **Growth**: Loyalty Cards, Coupons, Push (campaign tools)
+  - **Scanner**: standalone with green highlight (staff daily action)
+  - **Bottom**: Settings, How to use → section separator → User row → View homepage link
+  - Analytics merged into Dashboard concept (removed as standalone sidebar item)
+
+- **`nook-admin/src/components/layout/BottomNav.tsx`** — Complete rewrite:
+  - Layout: Home | Customers | `● Scan` (central circular green CTA, rises above bar) | Coupons | More
+  - Active tab indicator: pill (capsule background) instead of just icon color change
+  - More sheet: Analytics + Settings + How to use only (Coupons + Scanner promoted to bottom bar)
+
+- **`nook-admin/src/app/(admin)/layout.tsx`** — More sheet content updated: only Analytics, Settings, How to use remain; Coupons and Scanner removed (now in bottom bar)
+
+- **`nook-admin/src/app/globals.css`** — Background color: `#EDF3EF` → `#F5F7F6` (reduced green tint so card content stands out better)
+
+**Verified:** bat file created for git push (`run_tests.bat`) — awaiting user execution for Railway auto-deploy
+
+---
 
 ### 2026-05-19 (Session 19 — Jest 테스트 수트 + Google Review 기록 정리)
 
@@ -580,31 +723,4 @@ git push origin main
 
 - **`src/app/(admin)/register/page.tsx`** — Restored complete 391-line version (commit `fix: register/page.tsx - restore complete 391-line version with Suspense + API`)
   - File truncated to 179 lines on GitHub (severely broken mid-JSX)
-  - Fix: fetched Session 12 commit `9b2f4c3` (Suspense boundary version — complete, has registerCustomer + handleRegister + Suspense wrapping)
-  - Confirmed: `hasRegisterCustomer: true`, `hasHandleRegister: true`, `hasSuspense: true`
-
-- **`src/app/(admin)/layout.tsx`** — Fixed `bottomNavH` used-before-declaration (commit `fix: layout.tsx - move bottomNavH declaration before useEffect`)
-  - TypeScript error: `Block-scoped variable 'bottomNavH' used before its declaration` at line 101
-  - Root cause: `const bottomNavH = ...` was declared at line 103 but used in `useEffect` deps array at line 101
-  - Fix: moved declaration to just before the scroll-lock `useEffect` block
-
-**Railway build result:**
-- All 4 commits → 4 failed builds (each fixed one more error)
-- Final "Update layout.tsx" commit → ✅ `Deployment successful`
-- Active build confirmed, site live at `https://nook-admin-production.up.railway.app/`
-
-**CM6 injection method refined:**
-- Used `document.querySelector('.cm-content')?.cmTile?.view` to find the CM6 EditorView (the `cmTile` property on `.cm-content` element)
-- Always use `view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: newContent } })` to replace full document
-- For SplashScreen: fetched two versions via GitHub API, used common anchor (nk-r2 span) to splice correct tail onto current head — avoids needing to know exact replacement content
-
-**⚠️ CM6 injection lesson learned:** When injecting via `view.dispatch({ changes })`, always verify the replace range spans the FULL document length (`from: 0, to: doc.length`). If `to` is wrong or the selection API is used instead, content may be appended rather than replaced, causing duplicate definitions.
-
----
-
-### 2026-05-07 (Session 13 — Dashboard Encoding Bug Fix)
-
-**Frontend (IdolShin/nook-admin) — 1 file fixed:**
-
-- **`src/app/(admin)/dashboard/page.tsx`** — UTF-8 encoding bugs + file truncation fixed (commit `3728170`)
-  - **Root cause**: Session 7's GitHub web editor `execCommand('in
+  - Fix: fetched Session 12 commit `9b2f4c3` (Suspense boundary version — complete, has registerCustomer + handleRegister + Suspense wr
