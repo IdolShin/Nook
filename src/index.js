@@ -16,6 +16,7 @@ const permissionsRoutes = require('./routes/permissions')
 const analyticsRoutes   = require('./routes/analytics')
 const reviewRoutes      = require('./routes/reviews')
 const contactRoutes     = require('./routes/contact')
+const businessRoutes    = require('./routes/businesses')
 const schedule          = require('node-schedule')
 
 const app = express()
@@ -52,6 +53,7 @@ app.use('/api/analytics',   analyticsRoutes)
 app.use('/api/permissions', permissionsRoutes)
 app.use('/api/reviews',     reviewRoutes)
 app.use('/api/contact',     contactRoutes)
+app.use('/api/businesses',  businessRoutes)
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'nook-backend', time: new Date().toISOString() })
@@ -172,4 +174,6 @@ schedule.scheduleJob('0 9 * * *', async () => {
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
-  console.log(`\n Nook b
+  console.log(`\n Nook backend running on port ${PORT}`)
+  console.log(`   Health: http://localhost:${PORT}/health`)
+})

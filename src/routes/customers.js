@@ -10,7 +10,7 @@ const { authMiddleware } = require('../middleware/auth')
 // Public endpoint — no auth needed (customer fills in their info)
 router.post('/register', async (req, res) => {
   try {
-    const { card_id, name, phone, wallet_type, consent_push, consent_points } = req.body
+    const { card_id, name, phone, birthday, wallet_type, consent_push, consent_points } = req.body
 
     if (!card_id || !name || !phone) {
       return res.status(400).json({ error: 'card_id, name, phone required' })
@@ -28,6 +28,32 @@ router.post('/register', async (req, res) => {
 
     if (cardErr || !card) return res.status(404).json({ error: 'Card not found' })
     if (!card.is_active) return res.status(400).json({ error: 'Card is no longer active' })
+
+    // ─── Plan enforcement: customer count limit ───────────────
+    const { data: biz } = await supabase
+      .from('businesses')
+      .select('plan, is_superadmin')
+      .eq('id', card.business_id)
+      .single()
+
+    if (biz && !biz.is_superadmin) {
+      const plan = (biz.plan || 'basic').toLowerCase()
+      const customerLimits = { basic: 100, starter: 100, pro: 500 }
+      const limit = customerLimits[plan]
+      if (limit !== undefined) {
+        const { count } = await supabase
+          .from('customers')
+          .select('id', { count: 'exact', head: true })
+          .eq('business_id', card.business_id)
+        if ((count || 0) >= limit) {
+          const planLabel = plan === 'pro' ? 'Pro' : 'Basic'
+          return res.status(403).json({
+            error: `Customer limit reached. ${planLabel} plan supports up to ${limit} customers. Please contact us to upgrade.`,
+            plan_limit: true
+          })
+        }
+      }
+    }
 
     // Check duplicate phone for same card
     const { data: existing } = await supabase
@@ -50,6 +76,7 @@ router.post('/register', async (req, res) => {
         card_id,
         name,
         phone,
+        ...(birthday ? { birthday } : {}),
         wallet_type: wallet_type || 'unknown',
         qr_code,
         barcode,

@@ -133,11 +133,43 @@ router.post('/broadcast', authMiddleware, async (req, res) => {
     if (!message) return res.status(400).json({ error: 'message required' })
     if (message.length > 140) return res.status(400).json({ error: 'Message max 140 chars' })
 
+    // ─── Plan enforcement: push frequency ────────────────────
+    if (!req.business.is_superadmin) {
+      const plan = (req.business.plan || 'basic').toLowerCase()
+      const pushLimitDays = { basic: 30, starter: 30, pro: 7 }
+      const limitDays = pushLimitDays[plan]
+
+      if (limitDays !== undefined) {
+        const since = new Date(Date.now() - limitDays * 86400 * 1000).toISOString()
+        const { count } = await supabase
+          .from('push_logs')
+          .select('id', { count: 'exact', head: true })
+          .eq('business_id', req.business.id)
+          .eq('status', 'sent')
+          .gte('created_at', since)
+
+        if ((count || 0) > 0) {
+          const limitLabel = plan === 'pro' ? 'once per week' : 'once per month'
+          return res.status(429).json({
+            error: `${plan === 'pro' ? 'Pro' : 'Basic'} plan allows push notifications ${limitLabel}. Upgrade to Premium for unlimited pushes.`,
+            plan_limit: true
+          })
+        }
+      }
+    }
+
+    // Determine effective customer_ids (Pro: always all)
+    let effectiveIds = customer_ids || null
+    if (!req.business.is_superadmin) {
+      const plan = (req.business.plan || 'basic').toLowerCase()
+      if (plan !== 'premium') effectiveIds = null  // Basic & Pro always send to all
+    }
+
     const result = await pushService.broadcastToBusiness(
       req.business.id,
       message,
       req.business.name,
-      customer_ids || null
+      effectiveIds
     )
     res.json(result)
   } catch (err) {

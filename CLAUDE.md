@@ -200,9 +200,9 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 
 | Plan | Price | Customers | Cards | Features |
 |------|-------|-----------|-------|---------|
-| Basic | $59/mo | Up to 100 | 1 card | Stamp card, Google Wallet, push notifications |
-| Pro | $79/mo | Up to 500 | 3 cards | Everything in Basic + Apple Wallet, coupon system |
-| Premium | $119/mo | Unlimited | Unlimited | Everything in Pro + analytics, priority support, custom domain |
+| Basic | $79/mo | Up to 100 | 1 card | Stamp card, Google Wallet, push notifications |
+| Pro | $99/mo | Up to 500 | 3 cards | Everything in Basic + Apple Wallet, coupon system |
+| Premium | $129/mo | Unlimited | Unlimited | Everything in Pro + analytics, priority support, custom domain |
 
 ---
 
@@ -236,6 +236,15 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 - **Google Review reward system** — `src/routes/reviews.js`: GET/PATCH `/api/reviews/config`, GET `/api/reviews/public/:bizId`, POST `/api/reviews/initiate`; `review_rewards` table with `days_to_wait` delay; daily 9am scheduler processes pending → stamp or coupon issued + push notification
 - **Jest test suite** — `tests/` folder: auth (7), cards (6), customers (5), reviews (8) = 26 total; Supabase mock; `src/createApp.js` factory; `npm test` / `npm run test:ci`
 - **Navigation UX overhaul** — Sidebar restructured (Main/Growth/Scanner/Settings sections), BottomNav rewritten with central Scan CTA (circular green button) + pill active indicator, More sheet trimmed, bg color refined to #F5F7F6
+- **Push page audience targeting** — 4 group quick-select buttons (All/New/Active/Inactive) with customer count display; "Use template" pre-fills + auto-selects audience + switches to Compose tab; KO/EN language toggle for templates
+- **Customers add page** — dedicated `/customers/add` page (174 lines); customers page redesigned (4-segment filter, no popup)
+- **Contact page** — standalone `/contact` page (replaced modal); lang toggle; mobile responsive; success popup overlay; all CTA buttons link to `/contact`
+- **Homepage overhaul** — pricing updated (Basic $79 / Pro $99 / Premium $129); coupon section + Google Review push section added; contact modal removed; hero mobile polish
+
+- **Per-business registration pages** — `/join/[slug]` dynamic pages (e.g. `nook-wallet.com/join/nook-cafe`); business name/logo, card selector, name/phone/birthday fields, QR success screen
+- **Plan-based restrictions** — Basic/Pro/Premium limits enforced on frontend + backend
+- **`src/hooks/usePlan.ts`** — JWT decode hook exposing `plan`, `isSuperadmin`, `allowedCardTypes`, `customerLimit`, `pushLimitDays`, `canFilterAudience`
+- **Superadmin notifications** — Topbar `NotificationBell` gated behind `isSuperadmin`
 
 ---
 
@@ -243,6 +252,7 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 
 - **Google Wallet publishing approval** — submitted, waiting 1-3 days
   → Once approved: real customers can add passes to Google Wallet (currently demo mode only)
+- **Supabase migration needed** — run `supabase_migration_session29.sql` to add `birthday DATE` column to customers table
 
 ---
 
@@ -365,6 +375,158 @@ git push origin main
 ---
 
 ## Change Log
+
+### 2026-05-24 (Session 29 — 플랜 제한 시스템 + 비즈니스별 고객 등록 페이지)
+
+**백엔드 (IdolShin/Nook) — 4개 파일 변경 + 신규 1개:**
+
+- **`src/routes/cards.js`** — 플랜별 카드 생성 제한
+  - Basic/Starter: stamp 카드만 생성 가능 (non-stamp 시 403 반환)
+  - Basic: 카드 1개, Pro: 카드 3개 제한 (초과 시 403 반환)
+  - Premium + superadmin: 제한 없음
+
+- **`src/routes/customers.js`** — 고객 수 제한 + birthday 필드
+  - Basic/Starter: 최대 100명, Pro: 최대 500명 (초과 시 403 반환)
+  - `birthday` 필드 옵션 추가 (Supabase migration 필요: `supabase_migration_session29.sql`)
+
+- **`src/services/push.js`** — 푸시 빈도 제한
+  - Basic: 월 1회, Pro: 주 1회 제한 (push_logs 조회로 체크, 초과 시 429 반환)
+  - Basic/Pro: customer_ids 필터 무시 → 항상 전체 발송
+  - Premium + superadmin: 무제한, 필터 허용
+
+- **`src/routes/businesses.js`** — NEW: 공개 비즈니스 조회 API
+  - `GET /api/businesses/public/:slug` — slug(이름→하이픈)으로 비즈니스 조회, 활성 카드 목록 반환
+  - `GET /api/businesses/public` — 전체 비즈니스 + slug + register_url 목록
+
+- **`src/index.js`** — `/api/businesses` 라우트 등록
+
+**프론트엔드 (IdolShin/nook-admin) — 4개 파일 변경 + 신규 2개:**
+
+- **`src/hooks/usePlan.ts`** — NEW: JWT 디코딩 플랜 훅
+  - `usePlan()` → `{ plan, isSuperadmin, isBasic, isPro, isPremium, allowedCardTypes, customerLimit, cardLimit, pushLimitDays, canFilterAudience, canCreateCustomCoupon }`
+  - Basic/Starter: stamp만, 1카드, 100고객, 30일 주기, 필터 불가
+  - Pro: 모든 카드 타입, 3카드, 500고객, 7일 주기, 필터 불가
+  - Premium: 모든 기능 무제한
+
+- **`src/components/layout/Topbar.tsx`** — NotificationBell 슈퍼어드민 전용
+  - `usePlan().isSuperadmin`이 true일 때만 Bell 아이콘 표시 (모바일/데스크탑 양쪽)
+
+- **`src/app/(admin)/cards/page.tsx`** — 카드 생성 플랜 UI
+  - Basic 계정: stamp 외 카드 타입 버튼에 🔒 + 클릭 불가
+  - Basic/Pro 배너: 현재 플랜 제한 안내 (카드 수, 고객 수, 푸시 주기)
+
+- **`src/app/(admin)/push/page.tsx`** — 푸시 플랜 UI
+  - Basic/Pro: New/Active/Inactive 오디언스 버튼 🔒 잠금 (All만 활성)
+  - 플랜별 주의 문구 표시 (노란 박스: 필터 불가, 파란 박스: 빈도 제한)
+
+- **`src/app/(marketing)/join/[slug]/page.tsx`** — NEW: 비즈니스별 고객 등록 페이지
+  - URL 예: `nook-wallet.com/join/nook-cafe`, `nook-wallet.com/join/kook-미용실`
+  - 비즈니스 브랜드 헤더 (로고/이름/컬러)
+  - 카드 여러 개 시 카드 선택 UI, 1개 시 자동 표시
+  - 필드: 이름(필수), 전화번호(필수), 생일(선택 — 생일 쿠폰용)
+  - 동의 체크박스 + 등록 후 QR 코드 성공 화면
+  - KO/EN 언어 토글, 모바일 완전 대응
+
+- **`src/lib/api.ts`** — `registerCustomer` birthday 필드 추가, `getPublicBusiness()` 추가
+
+**⚠️ 배포 전 필수:**
+1. `supabase_migration_session29.sql` → Supabase Dashboard SQL Editor에서 실행
+2. `push_session29_backend.bat` 실행 (백엔드 Railway 자동 배포)
+3. `push_session29_frontend.bat` 실행 (프론트엔드 Railway 자동 배포)
+
+---
+
+### 2026-05-23 (Session 28 — Homepage/Contact 전면 개편: 독립 페이지 + 가격 업데이트 + 쿠폰 섹션)
+
+**프론트엔드 (IdolShin/nook-admin) — 대규모 마케팅 페이지 리뉴얼:**
+
+- **`src/app/(marketing)/contact/page.tsx`** — 새 독립 `/contact` 페이지 생성 (모달 방식 → 전용 페이지)
+  - 위치·플랜 선택·문의 내용이 표시되는 클린 레이아웃
+  - 한/영 언어 토글 (홈페이지 스타일 동일하게 적용)
+  - isMobile state로 모바일 단일 컬럼 레이아웃 처리
+  - 성공 팝업 오버레이 추가 (폼 제출 후)
+
+- **`src/app/(marketing)/Homepage.tsx`** — 홈페이지 주요 변경
+  - Contact 모달 완전 제거 → 모든 CTA 버튼이 `/contact` 페이지로 링크
+  - 쿠폰 섹션 추가 (Google Review + 자동 쿠폰 발송 홍보)
+  - Push Notification 섹션 개선
+  - 가격 업데이트: Basic $79 / Pro $99 / Premium $129
+  - 히어로 상단 여백 수정, 모바일 폴리시
+
+**Commits:** `04e9e43`, `daa0009`, `d160240`, `f048394`, `e291ac4`, `7e607a98`, `df91ac1`, `a86ebfe`, `7430cab` (IdolShin/nook-admin main)
+
+**Verified:** Railway 자동 배포 ✅
+
+---
+
+### 2026-05-23 (Session 27 — Push 페이지: Audience 그룹 버튼 + 템플릿 KO/EN 토글)
+
+**프론트엔드 (IdolShin/nook-admin) — 푸시 페이지 UX 개선:**
+
+- **`src/app/(admin)/push/page.tsx`** — Audience 그룹 셀렉터 + 템플릿 완전 연동
+  - 4개 색상 퀵셀렉트 버튼 (All / New / Active / Inactive) — 버튼마다 매칭 고객 수 표시
+  - `selectGroup()` 함수: 버튼 클릭 시 해당 고객 자동 선택
+  - "Use template" 버튼: 제목+메시지 자동 입력 + `selectGroup()` 호출 + Compose 탭으로 전환 (원클릭)
+  - 파일 복구도 포함 — 디스크 복사본이 History 섹션부터 잘려있어 완전판 재작성 (493줄)
+  - 푸시 템플릿 KO/EN 언어 토글 (국기 버튼 방식)
+
+**Commits:** `c1e7bb8`, `3b86e02` (IdolShin/nook-admin main)
+
+**Verified:** Railway 자동 배포 ✅
+
+---
+
+### 2026-05-23 (Session 26 — UI 개선: Biz 셀렉터 컴팩트화 + 고객/카드 페이지 재설계)
+
+**프론트엔드 (IdolShin/nook-admin) — 4개 파일 변경:**
+
+- **`src/app/(admin)/dashboard/page.tsx`** — 슈퍼어드민 비즈 셀렉터 컴팩트화
+- **`src/app/(admin)/customers/page.tsx`** — 팝업 제거, 4-세그먼트 필터, 인라인 레이아웃
+- **`src/app/(admin)/customers/add/page.tsx`** — NEW: 고객 추가 전용 페이지 (174줄)
+- **`src/app/(admin)/cards/page.tsx`** — 클린 헤더, 균일 너비 필터 버튼
+
+**Commit:** `9f87cf1` (IdolShin/nook-admin main)
+
+**Verified:** Railway 자동 배포 ✅
+
+---
+
+### 2026-05-24 (Session 25 — Contact Form: Resend 도메인 인증 + 이메일 리디자인 + 성공팝업 홈버튼)
+
+**이번 세션 완료 항목 4가지:**
+
+- **Resend 도메인 인증 — `nook-wallet.com`**
+  - 기존 문제: Resend 무료 플랜은 `onboarding@resend.dev` 발신 시 계정 소유자(`woosang930414@gmail.com`)에게만 전송 가능 → `info.tgtm@gmail.com` 수신 불가 (403 에러)
+  - 해결: Cloudflare Domain Connect → Resend 자동 DNS 설정 (DKIM TXT, SPF MX+TXT, DMARC TXT)
+  - 결과: `nook-wallet.com` 도메인 인증 완료 ✅, 다수 수신자에게 정상 발송 가능
+  - 발신 주소 변경: `onboarding@resend.dev` → `hello@nook-wallet.com`
+  - Backend commit: `af5e21e` (IdolShin/Nook main)
+
+- **Contact 이메일 바디 리디자인** (`src/routes/contact.js`)
+  - 기존: 좁은 포맷, 작은 글씨, 항목 간격 없음
+  - 개선: 다크 그린 그라디언트 헤더, Contact Details 카드, Message 카드, 구글 캘린더 버튼
+  - Reply 버튼 제거
+  - **Google Calendar 버튼 추가**: 클릭 시 `"BusinessName (접수)"` 1시간 이벤트로 캘린더 자동 등록
+    - URL 형식: `https://calendar.google.com/calendar/render?action=TEMPLATE&text=...&dates=START/END`
+    - 시작=문의 접수 시각, 종료=1시간 후
+  - Commit: `cf4085a` (IdolShin/Nook main)
+
+- **Contact 성공 팝업 "홈페이지로 가기" 버튼** (`src/app/(marketing)/contact/page.tsx`)
+  - 위치: "확인" 버튼 바로 아래
+  - 스타일: 투명 배경 + 초록 아웃라인 테두리 (`border: 1.5px solid #1D9E75`)
+  - 링크: `href="/"`
+  - 바이링귀얼: `{t('홈페이지로 가기', 'Go to Homepage', lang)}`
+  - GitHub 웹 에디터 Regexp Find/Replace 방식으로 커밋
+  - Commit: `46fe733` (IdolShin/nook-admin main)
+
+- **Railway 자동 배포**: 위 커밋들이 main 브랜치에 push됨 → 양쪽 서비스 자동 재빌드
+
+**⚠️ 기술 메모:**
+- GitHub 에디터 CM6 view를 JS로 찾기 불가 → Regexp Find/Replace UI로 우회 성공
+- `rspackChunk_github_ui_github_ui` (GitHub의 번들러)로 webpack require 접근 시도했으나 캐시 없어 실패
+- 로컬 Linux sandbox 마운트 파일이 GitHub 원본과 다른 경우 있음 (stale mount) — 항상 GitHub 웹 에디터 또는 API로 커밋할 것
+
+---
 
 ### 2026-05-21 (Session 24 — Dashboard Refinement: Font, Loading Screen, iOS Safe-Area)
 

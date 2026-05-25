@@ -42,6 +42,38 @@ router.post('/', async (req, res) => {
 
     const bizId = (req.business.is_superadmin && bodyBizId) ? bodyBizId : req.business.id
 
+    // ─── Plan enforcement (skip for superadmin) ───────────────
+    if (!req.business.is_superadmin) {
+      const plan = (req.business.plan || 'basic').toLowerCase()
+
+      // Card type restriction
+      if (plan === 'basic' || plan === 'starter') {
+        if (card_type !== 'stamp') {
+          return res.status(403).json({
+            error: 'Basic plan only supports stamp cards. Upgrade to Pro or Premium for more card types.',
+            plan_limit: true
+          })
+        }
+      }
+
+      // Card count restriction
+      const cardLimits = { basic: 1, starter: 1, pro: 3 }
+      const limit = cardLimits[plan]
+      if (limit !== undefined) {
+        const { count } = await supabase
+          .from('loyalty_cards')
+          .select('id', { count: 'exact', head: true })
+          .eq('business_id', bizId)
+        if ((count || 0) >= limit) {
+          const planLabel = plan === 'pro' ? 'Pro' : 'Basic'
+          return res.status(403).json({
+            error: `${planLabel} plan allows up to ${limit} card${limit > 1 ? 's' : ''}. Upgrade to Premium for unlimited cards.`,
+            plan_limit: true
+          })
+        }
+      }
+    }
+
     const { data, error } = await supabase
       .from('loyalty_cards')
       .insert({
