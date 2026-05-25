@@ -120,9 +120,9 @@ ID:       06fd310f-7a77-497c-b682-2b668fa17a29
 | `businesses` | 가게/사장님 계정 — email, password_hash, plan, logo_url, **is_superadmin**, **page_permissions** |
 | `business_users` | 스태프 계정 per business — email, name, role, page_permissions, password_hash |
 | `loyalty_cards` | 로열티 카드 종류 — type, goal_stamps, reward_desc, color, google_class_id |
-| `customers` | 고객 정보 — linked to business + card, phone, qr_code, barcode, wallet_type |
+| `customers` | 고객 정보 — linked to business + card, phone, qr_code, barcode, wallet_type, birthday |
 | `stamps` | 스탬프 적립 기록 — customer_id, card_id, scan_type, scanned_by |
-| `redemptions` | 리워드 사용 기록 |
+| `redemptions` | 리워드 사용 기록 — **stamps_redeemed** (stamp cards), **points_redeemed** (membership), **redeem_type** ('stamp'/'points') |
 | `push_logs` | 푸시 발송 기록 |
 | `coupons` | 쿠폰 마스터 — discount, trigger_type, valid_days |
 | `coupon_passes` | 고객별 발급 쿠폰 — barcode, status (active/used/expired) |
@@ -159,7 +159,9 @@ GET  /api/customers/lookup       🔒  ?code=&type=qr|barcode  →  customer + s
 ### Scan
 ```
 POST /api/scan                   🔒  { code, scan_type }   →  stamp + Google Wallet sync + push
-POST /api/scan/redeem            🔒  { customer_id }        →  redemption + push
+                                      membership: 100pts/scan cumulative, wallet shows total points
+POST /api/scan/redeem            🔒  { customer_id }        →  redemption + push (stamp cards)
+POST /api/scan/redeem-points     🔒  { customer_id, points } →  points deduction + push (membership)
 ```
 
 ### Google Wallet
@@ -177,8 +179,10 @@ POST /api/push/broadcast         🔒  { message, customer_ids? }
 ```
 GET  /api/coupons                🔒  →  { coupons }
 POST /api/coupons                🔒  { name, discount_type, discount_value, trigger_type, valid_days }
-POST /api/coupons/:id/issue      🔒  { customer_ids }  →  issues passes
-POST /api/coupons/redeem         🔒  { barcode }       →  marks pass as used
+POST /api/coupons/:id/issue      🔒  { customer_ids }  →  issues passes + push with pass URL
+POST /api/coupons/redeem         🔒  { barcode }       →  marks pass as redeemed
+GET  /api/coupons/pass/:barcode  PUBLIC  →  { pass, coupon, business, customer }  (customer-facing)
+GET  /api/customers/:id/redemptions  🔒  →  { redemptions }  (stamps/points history)
 ```
 
 ### Permissions (superadmin only)
@@ -245,6 +249,16 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 - **Plan-based restrictions** — Basic/Pro/Premium limits enforced on frontend + backend
 - **`src/hooks/usePlan.ts`** — JWT decode hook exposing `plan`, `isSuperadmin`, `allowedCardTypes`, `customerLimit`, `pushLimitDays`, `canFilterAudience`
 - **Superadmin notifications** — Topbar `NotificationBell` gated behind `isSuperadmin`
+- **Join page V2** — `/join/[slug]` redesigned: Nook Wallet header, Google/Apple Wallet badges, dropdown card selector (multi-card), KO/EN lang toggle in header, modern design
+- **Settings superadmin-only** — Sidebar Settings menu hidden for non-superadmin accounts (`usePlan().isSuperadmin` gate)
+- **Membership points system** — 100pts per scan, cumulative (never reset), Google Wallet shows total points, `updateMembershipPoints()` syncs wallet
+- **Points redemption** — `POST /api/scan/redeem-points`, balance = total_stamps×100 − sum(points_redeemed), recorded in redemptions table
+- **Redemption tracking** — `redemptions` table extended: `stamps_redeemed`, `points_redeemed`, `redeem_type` columns; new `GET /api/customers/:id/redemptions` endpoint
+- **Customers page overhaul** — Points column (membership=purple pts, others=—), Redeems tab with history, Spend column removed, `Send` import fix (was crashing CustomerDetail), `onSendCoupon` prop wired
+- **Scanner membership UI** — separate success card: purple star icon, "+100 pts / Total: X,XXX pts" display; MiniCardArt shows "100 pts/visit" badge
+- **Customer-facing coupon pass page** — `nook-wallet.com/pass/[barcode]` public page (no auth); shows QR code, barcode, status badge, discount label, expiry; mobile-first design
+- **Public coupon pass API** — `GET /api/coupons/pass/:barcode` (before authMiddleware, no auth required)
+- **Push notification with pass URL** — coupon issue push now includes `https://nook-wallet.com/pass/${barcode}` link
 
 ---
 
@@ -252,22 +266,23 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 
 - **Google Wallet publishing approval** — submitted, waiting 1-3 days
   → Once approved: real customers can add passes to Google Wallet (currently demo mode only)
-- **Supabase migration done** ✅ — `birthday DATE` column added to customers table (2026-05-25)
+- **Supabase migration done** ✅ — `birthday DATE` column added + `redemptions` table columns added (2026-05-25)
+- **⚠️ Supabase migration for Session 32** — `supabase_migration_session32.sql` must be run (adds stamps_redeemed, points_redeemed, redeem_type to redemptions table)
 
 ---
 
 ## Todo List
 
 ### 🔴 Urgent
-- [ ] **UI bug fixes** — remaining forms not yet wired to real API
-      (New Card form, customer search filters, etc.)
+- [ ] **Run `supabase_migration_session32.sql`** — adds stamps_redeemed/points_redeemed/redeem_type to redemptions table (required before bat files)
+- [ ] **Run `push_session32_backend.bat`** — deploys scan.js, customers.js, coupons.js, googleWallet.js
+- [ ] **Run `push_session32_frontend.bat`** — deploys scanner/page.tsx, customers/page.tsx, pass/[barcode]/page.tsx, MiniCardArt.tsx, api.ts
+- [ ] **Resend API key** — add to Railway backend env vars
+- [ ] **Coupon → Google Wallet** — real connection test end-to-end
 - [x] **Edit Card form** ✅ Done (Session 6)
 - [x] **Register page backend** ✅ Done (Session 6)
 - [x] **Scanner coupon redeem** ✅ Done (Session 6)
-- [x] **Domain purchase** ✅ Done (Session 21) — `nook-wallet.com` purchased via Cloudflare, DNS CNAME → Railway frontend, NEXT_PUBLIC_API_URL updated, /api/* rewrite proxy added, backend CORS updated
-- [ ] **Resend API key** — add to Railway backend env vars
-- [ ] **Coupon → Google Wallet** — real connection test end-to-end
-- [ ] **Scanner app** — wire coupon scan to real `POST /api/coupons/redeem`
+- [x] **Domain purchase** ✅ Done (Session 21)
 - [x] **Homepage** ✅ Done (Session 7) — mobile responsive fix: `word-break: keep-all` on all Korean text, `overflow-x: hidden` at 980px, hero grid 55fr/45fr, h1 clamp
 - [x] **Dashboard charts** ✅ Done (Session 7) — wired to real API: KPI stats, line chart (30d stamps/redeems), donut (card type mix), activity feed (recent signups)
 - [x] **New Card registration bug** ✅ Done (Session 8) — fixed 502 caused by truncated analytics.js on GitHub
@@ -375,6 +390,93 @@ git push origin main
 ---
 
 ## Change Log
+
+### 2026-05-25 (Session 32 — 멤버십 포인트 시스템 + 쿠폰 패스 페이지 + 고객 페이지 개편)
+
+**백엔드 (IdolShin/Nook) — 4개 파일 변경:**
+
+- **`src/routes/scan.js`** — 멤버십 카드 포인트 적립 처리
+  - `isMembership = cardType === 'membership'` 분기 추가
+  - 멤버십: 100pts/스캔, 누적 (reset 없음), `totalPoints = newTotal * 100`
+  - `updateMembershipPoints(customer.id, totalPoints)` — Google Wallet 동기화
+  - `POST /api/scan/redeem-points` 엔드포인트 추가: 포인트 차감, 잔액 계산(total_stamps×100 − 이전 points_redeemed 합산), redemptions 기록
+
+- **`src/routes/customers.js`** — card_type 노출 + 리딤 히스토리 API
+  - SELECT에 `card_type` from loyalty_cards 포함, 응답에 `total_points` (membership만) 포함
+  - `GET /api/customers/:id/redemptions` 엔드포인트 추가
+
+- **`src/routes/coupons.js`** — 공개 패스 조회 API + 푸시 URL 개선
+  - `GET /api/coupons/pass/:barcode` — **authMiddleware 이전에 등록** (공개, 인증 불필요)
+  - pass + coupon + business + customer.name 반환
+  - 쿠폰 발급 푸시 알림에 `https://nook-wallet.com/pass/${barcode}` URL 포함
+
+- **`src/services/googleWallet.js`** — 멤버십 포인트 동기화
+  - `updateMembershipPoints(customerId, totalPoints)` 함수 추가
+  - loyalty object의 `loyaltyPoints` 필드를 총 누적 포인트로 업데이트
+
+- **`supabase_migration_session32.sql`** — redemptions 테이블 확장
+  - `stamps_redeemed INTEGER`, `points_redeemed INTEGER`, `redeem_type TEXT` 컬럼 추가
+  - **⚠️ 아직 실행 안 됨 — Supabase Dashboard에서 실행 필요**
+
+**프론트엔드 (IdolShin/nook-admin) — 5개 파일 변경:**
+
+- **`src/app/(admin)/customers/page.tsx`** — 고객 페이지 전면 개편
+  - `Send` 아이콘 import 추가 (누락으로 CustomerDetail 클릭 시 crash → 에러 페이지 오류 수정)
+  - `onSendCoupon` prop 두 곳(데스크탑/모바일) 모두 추가
+  - Spend 컬럼 제거 → Points 컬럼 추가 (membership=보라색 pts, 나머지=—)
+  - Redeems 탭 추가: stamps_redeemed (녹색 −10 stamps) / points_redeemed (보라색 −500 pts) 히스토리
+
+- **`src/app/(admin)/scanner/page.tsx`** — 멤버십 스캔 성공 UI
+  - 보라색 별 아이콘 + "+100 pts / Total: X,XXX pts" 두 카드 표시
+
+- **`src/components/cards/MiniCardArt.tsx`** — 멤버십 배지
+  - "100 pts/visit" 보라색 배지 추가
+
+- **`src/lib/api.ts`** — 타입 + 함수 추가
+  - `ApiCustomer`: `card_type`, `total_points` 추가
+  - `ApiRedemption` 인터페이스 추가
+  - `redeemPoints()`, `customerRedemptions()` 함수 추가
+
+- **`src/app/(marketing)/pass/[barcode]/page.tsx`** — NEW: 고객용 쿠폰 패스 페이지
+  - `nook-wallet.com/pass/[바코드]` — 인증 불필요 공개 페이지
+  - QR 코드 + 바코드 번호 크게 표시
+  - 상태 배지 (Active/Redeemed/Expired), 할인 내용, 유효기간, 비즈니스 로고
+  - 모바일 우선 디자인
+
+**배포 파일:**
+- `push_session32_backend.bat` — scan.js, customers.js, coupons.js, googleWallet.js
+- `push_session32_frontend.bat` — scanner/page.tsx, customers/page.tsx, pass/[barcode]/page.tsx, MiniCardArt.tsx, api.ts
+
+**⚠️ 배포 전 필수:**
+1. `supabase_migration_session32.sql` → Supabase Dashboard SQL Editor에서 실행
+2. `push_session32_backend.bat` 실행
+3. `push_session32_frontend.bat` 실행
+
+---
+
+### 2026-05-25 (Session 30 — Join 페이지 V2 리디자인 + Settings 슈퍼어드민 전용 + Superadmin 하드코딩 버그 수정)
+
+**프론트엔드 (IdolShin/nook-admin) — 3개 커밋:**
+
+- **`src/app/(marketing)/join/[slug]/page.tsx`** — `/join/[slug]` 페이지 2단계 리디자인
+  - V1 (커밋 `7648e0d`): Nook Wallet 헤더 + 지갑 배지(Google/Apple Wallet) + 기본 스탬프 카드 자동 선택 로직 + Sidebar에 "Customer Sign-up" 메뉴 항목 추가
+  - V2 (커밋 `e4f2a80`): 헤더에 한/영 언어 토글 추가, 카드 여러 개일 때 드롭다운 셀렉터로 교체, 모던 월렛 헤더 디자인 적용 (222줄 추가)
+  - 소소한 수정 (커밋 `c101572`): contact.tsx stray `h` 문자 제거 + join 페이지의 marketing.css import 경로 오류 수정
+
+- **`src/components/layout/Sidebar.tsx`** — Settings 메뉴 슈퍼어드민 전용 처리 (커밋 `7f7810e`)
+  - `usePlan().isSuperadmin`이 false인 일반 비즈니스 계정에게 Sidebar의 Settings 항목 비표시
+  - 슈퍼어드민(Woosang)만 Settings 접근 가능
+
+**백엔드 (IdolShin/Nook) — 미커밋 (로컬 수정, push_fix_superadmin.bat 대기 중):**
+
+- **`src/routes/auth.js`** — Superadmin 하드코딩 버그 수정
+  - 기존: `SUPERADMIN_EMAILS = ['woosang930414@gmail.com', 'woosang@nook.com']` → `woosang@nook.com`이 DB에서 `is_superadmin: false`로 설정해도 항상 superadmin 처리됨
+  - 수정: `SUPERADMIN_EMAILS = ['woosang930414@gmail.com']`만 남김
+  - ⚠️ **push_fix_superadmin.bat 아직 실행 안 됨** — Railway 배포 전
+
+**Verified:** 프론트엔드 4개 커밋 Railway 자동 배포 ✅ / 백엔드 auth.js 수정은 미배포
+
+---
 
 ### 2026-05-24 (Session 29 — 플랜 제한 시스템 + 비즈니스별 고객 등록 페이지)
 
