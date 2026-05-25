@@ -225,7 +225,8 @@ router.get('/:id', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   try {
     const allowed = ['title', 'description', 'is_active', 'color', 'valid_days',
-                     'max_redemptions', 'trigger_type', 'trigger_config', 'terms']
+                     'max_redemptions', 'trigger_type', 'trigger_config', 'terms',
+                     'expires_at', 'discount_value', 'free_item_name', 'coupon_type']
     const updates = {}
     for (const key of allowed) {
       if (key in req.body) updates[key] = req.body[key]
@@ -241,6 +242,28 @@ router.patch('/:id', async (req, res) => {
     res.json({ coupon: data })
   } catch (err) {
     res.status(500).json({ error: 'Failed to update coupon' })
+  }
+})
+
+// ─── DELETE /api/coupons/:id ──────────────────────────────────
+router.delete('/:id', async (req, res) => {
+  try {
+    // Delete associated coupon_passes first
+    await supabase
+      .from('coupon_passes')
+      .delete()
+      .eq('coupon_id', req.params.id)
+
+    const { error } = await supabase
+      .from('coupons')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('business_id', req.business.id)
+
+    if (error) throw error
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete coupon' })
   }
 })
 

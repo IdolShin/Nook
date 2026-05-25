@@ -118,6 +118,29 @@ router.patch('/:id', async (req, res) => {
   }
 })
 
+// --- DELETE /api/cards/:id ---
+router.delete('/:id', async (req, res) => {
+  try {
+    const bizId = req.business.id
+    const { data: card } = await supabase
+      .from('loyalty_cards')
+      .select('id')
+      .eq('id', req.params.id)
+      .eq('business_id', bizId)
+      .single()
+    if (!card) return res.status(404).json({ error: 'Card not found' })
+    const { error } = await supabase
+      .from('loyalty_cards')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('business_id', bizId)
+    if (error) throw error
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete card' })
+  }
+})
+
 // âââ GET /api/cards/:id/stats ââââââââââââââââââââââââââââââââ
 // ì¹´ëë³ íµê³
 router.get('/:id/stats', async (req, res) => {
