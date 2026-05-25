@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const supabase = require('../db/supabase')
 
-const SUPERADMIN_EMAILS = ['woosang930414@gmail.com', 'woosang@nook.com']
+const SUPERADMIN_EMAILS = ['woosang930414@gmail.com']
 
 // ─── Helper: build JWT payload with permissions ──────────────
 function buildToken(biz) {
