@@ -252,7 +252,7 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 
 - **Google Wallet publishing approval** — submitted, waiting 1-3 days
   → Once approved: real customers can add passes to Google Wallet (currently demo mode only)
-- **Supabase migration needed** — run `supabase_migration_session29.sql` to add `birthday DATE` column to customers table
+- **Supabase migration done** ✅ — `birthday DATE` column added to customers table (2026-05-25)
 
 ---
 
