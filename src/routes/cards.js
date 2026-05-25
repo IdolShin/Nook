@@ -122,21 +122,50 @@ router.patch('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const bizId = req.business.id
-    const { data: card } = await supabase
+    const cardId = req.params.id
+
+    // Verify card belongs to this business
+    const { data: card, error: findErr } = await supabase
       .from('loyalty_cards')
       .select('id')
-      .eq('id', req.params.id)
+      .eq('id', cardId)
       .eq('business_id', bizId)
-      .single()
+      .maybeSingle()
+
+    if (findErr) throw findErr
     if (!card) return res.status(404).json({ error: 'Card not found' })
-    const { error } = await supabase
+
+    // Get all customers on this card (to cascade their stamps/redemptions)
+    const { data: customers } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('card_id', cardId)
+      .eq('business_id', bizId)
+
+    const customerIds = (customers || []).map(c => c.id)
+
+    // Cascade delete: stamps, redemptions, then customers, then the card
+    if (customerIds.length > 0) {
+      await supabase.from('stamps').delete().in('customer_id', customerIds)
+      await supabase.from('redemptions').delete().in('customer_id', customerIds)
+      await supabase.from('customers').delete().in('id', customerIds)
+    }
+
+    // Also delete any orphaned stamps/redemptions directly on the card
+    await supabase.from('stamps').delete().eq('card_id', cardId)
+    await supabase.from('redemptions').delete().eq('card_id', cardId)
+
+    // Finally delete the card
+    const { error: deleteErr } = await supabase
       .from('loyalty_cards')
       .delete()
-      .eq('id', req.params.id)
+      .eq('id', cardId)
       .eq('business_id', bizId)
-    if (error) throw error
+
+    if (deleteErr) throw deleteErr
     res.json({ success: true })
   } catch (err) {
+    console.error('Delete card error:', err)
     res.status(500).json({ error: 'Failed to delete card' })
   }
 })
