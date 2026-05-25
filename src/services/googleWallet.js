@@ -28,6 +28,7 @@ function objectId(customerId) {
 }
 
 function buildClass(card, business) {
+  const isMembership = card.card_type === 'membership'
   return {
     id: classId(card.id),
     issuerName: business.name,
@@ -39,34 +40,38 @@ function buildClass(card, business) {
       },
       contentDescription: { defaultValue: { language: 'en-US', value: business.name } }
     },
-    rewardsTierLabel: 'Stamps',
-    rewardsTier: card.reward_desc || `${card.goal_stamps} stamps for reward`,
+    rewardsTierLabel: isMembership ? 'Points' : 'Stamps',
+    rewardsTier: isMembership
+      ? (card.reward_desc || 'Earn 100 pts per visit')
+      : (card.reward_desc || `${card.goal_stamps} stamps for reward`),
     hexBackgroundColor: card.color || '#1D9E75',
     reviewStatus: 'UNDER_REVIEW',
     textModulesData: [
       {
         id: 'reward_info',
-        header: 'Reward',
-        body: card.reward_desc || `Collect ${card.goal_stamps} stamps for a free reward`
+        header: isMembership ? 'Membership Benefit' : 'Reward',
+        body: isMembership
+          ? (card.reward_desc || 'Earn 100 points per visit')
+          : (card.reward_desc || `Collect ${card.goal_stamps} stamps for a free reward`)
       }
     ]
   }
 }
 
 function buildObject(customer, card, currentStamps) {
-  return {
+  const isMembership = card.card_type === 'membership'
+  // For membership: currentStamps is visit count, display value = visits × 100
+  const displayPoints = isMembership ? (currentStamps * 100) : currentStamps
+
+  const obj = {
     id: objectId(customer.id),
     classId: classId(card.id),
     state: 'ACTIVE',
     accountId: customer.id,
     accountName: customer.name,
     loyaltyPoints: {
-      label: 'Stamps',
-      balance: { int: currentStamps }
-    },
-    secondaryLoyaltyPoints: {
-      label: 'Goal',
-      balance: { int: card.goal_stamps }
+      label: isMembership ? 'Points' : 'Stamps',
+      balance: { int: displayPoints }
     },
     barcode: {
       type: 'QR_CODE',
@@ -76,11 +81,23 @@ function buildObject(customer, card, currentStamps) {
     textModulesData: [
       {
         id: 'reward_detail',
-        header: 'Reward',
-        body: card.reward_desc || `${card.goal_stamps} stamps for a reward`
+        header: isMembership ? 'Membership Benefit' : 'Reward',
+        body: isMembership
+          ? (card.reward_desc || 'Earn 100 points per visit')
+          : (card.reward_desc || `${card.goal_stamps} stamps for a reward`)
       }
     ]
   }
+
+  // Stamp cards only: show goal progress
+  if (!isMembership) {
+    obj.secondaryLoyaltyPoints = {
+      label: 'Goal',
+      balance: { int: card.goal_stamps }
+    }
+  }
+
+  return obj
 }
 
 // ─── createLoyaltyClass ──────────────────────────────────────
@@ -168,6 +185,36 @@ async function updateStamps(customerId, currentStamps) {
     ...existing.loyaltyPoints,
     balance: { int: currentStamps }
   }
+
+  const { data } = await client.loyaltyobject.update({
+    resourceId: resId,
+    requestBody: existing
+  })
+  return data
+}
+
+// ─── updateMembershipPoints ──────────────────────────────────
+// 멤버십 카드 포인트 업데이트 (스캔 1회 = +100pts, 누적)
+async function updateMembershipPoints(customerId, totalPoints) {
+  const auth = getAuth()
+  const client = google.walletobjects({ version: 'v1', auth })
+  const resId = objectId(customerId)
+
+  let existing
+  try {
+    const { data } = await client.loyaltyobject.get({ resourceId: resId })
+    existing = data
+  } catch (err) {
+    if (err.code === 404) throw new Error(`Wallet object not found for customer ${customerId}`)
+    throw err
+  }
+
+  existing.loyaltyPoints = {
+    label: 'Points',
+    balance: { int: totalPoints }
+  }
+  // Membership has no goal — remove secondaryLoyaltyPoints if present
+  delete existing.secondaryLoyaltyPoints
 
   const { data } = await client.loyaltyobject.update({
     resourceId: resId,
@@ -329,6 +376,7 @@ function generateCouponWalletLink(passId) {
 }
 
 module.exports = {
-  createLoyaltyClass, createLoyaltyObject, generateWalletLink, updateStamps, updateWithMessage,
+  createLoyaltyClass, createLoyaltyObject, generateWalletLink,
+  updateStamps, updateMembershipPoints, updateWithMessage,
   createCouponClass, createCouponObject, updateCouponPassStatus, generateCouponWalletLink
 }

@@ -3,7 +3,7 @@ const router = express.Router()
 const supabase = require('../db/supabase')
 const { authMiddleware } = require('../middleware/auth')
 const { pushService } = require('../services/push')
-const { updateStamps } = require('../services/googleWallet')
+const { updateStamps, updateMembershipPoints } = require('../services/googleWallet')
 
 // ─── POST /api/scan ──────────────────────────────────────────
 // 핵심 엔드포인트: QR/바코드 스캔 → 스탬프 적립
@@ -55,12 +55,18 @@ router.post('/', authMiddleware, async (req, res) => {
 
     // 4. Calculate new stamp count
     const newTotal   = (prevCount || 0) + 1
-    const newCurrent = newTotal % goal
-    const isReward   = newCurrent === 0   // completed a full round
+    const cardType   = customer.loyalty_cards?.card_type || 'stamp'
+    const isMembership = cardType === 'membership'
 
-    // 5. If reward — record redemption prompt (customer still needs to claim)
+    // Membership: cumulative points (100 pts per scan, never resets)
+    // Stamp/cashback/coupon: cycle-based with goal
+    const newCurrent = isMembership ? null : (newTotal % goal)
+    const isReward   = isMembership ? false : (newCurrent === 0)
+    const totalPoints = isMembership ? newTotal * 100 : null
+
+    // 5. If reward (stamp cards only) — auto-issue stamp_complete coupons
     let rewardReady = false
-    if (isReward) {
+    if (!isMembership && isReward) {
       rewardReady = true
 
       // Auto-issue stamp_complete trigger coupons (fire-and-forget)
@@ -106,29 +112,45 @@ router.post('/', authMiddleware, async (req, res) => {
 
     // 6. Sync Google Wallet (fire-and-forget — don't delay the scan response)
     if (customer.wallet_type === 'google') {
-      updateStamps(customer.id, newCurrent).catch(err =>
-        console.error('[Google Wallet] stamp sync failed:', err.message)
-      )
+      if (isMembership) {
+        // Membership: update wallet to show cumulative points
+        updateMembershipPoints(customer.id, totalPoints).catch(err =>
+          console.error('[Google Wallet] membership points sync failed:', err.message)
+        )
+      } else {
+        updateStamps(customer.id, newCurrent).catch(err =>
+          console.error('[Google Wallet] stamp sync failed:', err.message)
+        )
+      }
     }
 
     // 7. Send push notification
-    const pushMsg = isReward
-      ? `Stamp added! You now have ${goal}/${goal}. Your free ${customer.loyalty_cards?.reward_desc || 'reward'} is ready!`
-      : `Stamp added! You now have ${newCurrent}/${goal}. ${goal - newCurrent} more for your free reward.`
+    const pushMsg = isMembership
+      ? `+100 points! Total: ${totalPoints} pts. ${customer.loyalty_cards?.reward_desc ? '(' + customer.loyalty_cards.reward_desc + ')' : 'Keep it up!'}`
+      : isReward
+        ? `Stamp added! You now have ${goal}/${goal}. Your free ${customer.loyalty_cards?.reward_desc || 'reward'} is ready!`
+        : `Stamp added! You now have ${newCurrent}/${goal}. ${goal - newCurrent} more for your free reward.`
 
     await pushService.sendToCustomer(customer, pushMsg, req.business.name)
 
     res.json({
       success:        true,
       customer_name:  customer.name,
-      prev_stamps:    prevCurrent,
-      new_stamps:     isReward ? goal : newCurrent,   // show full on reward
-      goal_stamps:    goal,
+      card_type:      cardType,
+      // Membership-specific
+      points_earned:  isMembership ? 100 : null,
+      total_points:   totalPoints,
+      // Stamp-specific (null for membership)
+      prev_stamps:    isMembership ? null : prevCurrent,
+      new_stamps:     isMembership ? null : (isReward ? goal : newCurrent),
+      goal_stamps:    isMembership ? null : goal,
       reward_ready:   rewardReady,
       scan_type:      scan_type || 'qr',
-      message:        isReward
-        ? `Reward unlocked! ${customer.name} gets a free ${customer.loyalty_cards?.reward_desc || 'reward'}.`
-        : `Stamp added! ${customer.name} now has ${newCurrent}/${goal}.`
+      message:        isMembership
+        ? `+100 pts! ${customer.name} now has ${totalPoints} pts total.`
+        : isReward
+          ? `Reward unlocked! ${customer.name} gets a free ${customer.loyalty_cards?.reward_desc || 'reward'}.`
+          : `Stamp added! ${customer.name} now has ${newCurrent}/${goal}.`
     })
   } catch (err) {
     console.error('Scan error:', err)
