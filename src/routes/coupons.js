@@ -3,6 +3,46 @@ const router   = express.Router()
 const supabase = require('../db/supabase')
 const { authMiddleware } = require('../middleware/auth')
 
+// ─── GET /api/coupons/pass/:barcode ──────────────────────────
+// PUBLIC — no auth required (customer-facing pass page)
+router.get('/pass/:barcode', async (req, res) => {
+  try {
+    const { barcode } = req.params
+
+    const { data: pass, error: passErr } = await supabase
+      .from('coupon_passes')
+      .select('id, barcode, status, issued_at, expires_at, redeemed_at, customer_id, coupon_id, business_id')
+      .eq('barcode', barcode)
+      .single()
+
+    if (passErr || !pass) {
+      return res.status(404).json({ error: 'Pass not found' })
+    }
+
+    const [{ data: coupon }, { data: business }, { data: customer }] = await Promise.all([
+      supabase.from('coupons')
+        .select('id, title, coupon_type, discount_value, free_item_name, description, color, terms, valid_days')
+        .eq('id', pass.coupon_id).single(),
+      supabase.from('businesses')
+        .select('id, name, logo_url')
+        .eq('id', pass.business_id).single(),
+      supabase.from('customers')
+        .select('id, name')
+        .eq('id', pass.customer_id).single()
+    ])
+
+    res.json({
+      pass,
+      coupon,
+      business,
+      customer: customer ? { name: customer.name } : null
+    })
+  } catch (err) {
+    console.error('Get pass error:', err)
+    res.status(500).json({ error: 'Failed to fetch pass' })
+  }
+})
+
 router.use(authMiddleware)
 
 function generateBarcode() {
@@ -357,7 +397,7 @@ router.post('/:id/issue', async (req, res) => {
           : coupon.free_item_name || coupon.title
         pushService.sendToCustomer(
           customer,
-          `You received a coupon! ${coupon.title} — ${label}. Expires ${expiresAt.toLocaleDateString()}.`,
+          `You received a coupon! ${coupon.title} — ${label}. View your coupon: https://nook-wallet.com/pass/${barcode}`,
           req.business.name
         ).catch(() => {})
       }
