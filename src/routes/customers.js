@@ -120,7 +120,7 @@ router.get('/', authMiddleware, async (req, res) => {
       .from('customers')
       .select(`
         id, name, phone, qr_code, barcode, wallet_type, card_id, created_at,
-        loyalty_cards ( goal_stamps, reward_desc )
+        loyalty_cards ( card_type, goal_stamps, reward_desc )
       `)
       .eq('business_id', req.business.id)
       .order('created_at', { ascending: false })
@@ -141,8 +141,10 @@ router.get('/', authMiddleware, async (req, res) => {
     }
 
     const result = customers.map(c => {
-      const goal  = c.loyalty_cards?.goal_stamps || 10
-      const total = counts[c.id] || 0
+      const goal       = c.loyalty_cards?.goal_stamps || 10
+      const cardType   = c.loyalty_cards?.card_type || 'stamp'
+      const total      = counts[c.id] || 0
+      const isMembership = cardType === 'membership'
       return {
         id:             c.id,
         name:           c.name,
@@ -153,10 +155,12 @@ router.get('/', authMiddleware, async (req, res) => {
         card_id:        c.card_id,
         business_id:    req.business.id,
         created_at:     c.created_at,
+        card_type:      cardType,
         total_stamps:   total,
-        current_stamps: total % goal,
-        rewards_earned: Math.floor(total / goal),
-        goal_stamps:    goal,
+        total_points:   isMembership ? total * 100 : null,
+        current_stamps: isMembership ? null : (total % goal),
+        rewards_earned: isMembership ? null : Math.floor(total / goal),
+        goal_stamps:    isMembership ? null : goal,
         reward_desc:    c.loyalty_cards?.reward_desc
       }
     })
@@ -218,6 +222,25 @@ router.get('/lookup', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('Lookup error:', err)
     res.status(500).json({ error: 'Lookup failed' })
+  }
+})
+
+// ─── GET /api/customers/:id/redemptions ──────────────────────
+// 고객별 리딤 기록 (stamps_redeemed, points_redeemed 포함)
+router.get('/:id/redemptions', authMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('redemptions')
+      .select('id, stamps_redeemed, points_redeemed, redeem_type, created_at')
+      .eq('customer_id', req.params.id)
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    if (error) throw error
+    res.json({ redemptions: data || [] })
+  } catch (err) {
+    console.error('Get redemptions error:', err)
+    res.status(500).json({ error: 'Failed to fetch redemptions' })
   }
 })
 

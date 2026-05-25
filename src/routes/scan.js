@@ -188,10 +188,12 @@ router.post('/redeem', authMiddleware, async (req, res) => {
       })
     }
 
-    // Record redemption
+    // Record redemption with stamp count
     await supabase.from('redemptions').insert({
       customer_id,
-      card_id: customer.card_id
+      card_id:         customer.card_id,
+      stamps_redeemed: goal,
+      redeem_type:     'stamp'
     })
 
     // Push: confirm redemption
@@ -208,6 +210,74 @@ router.post('/redeem', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('Redeem error:', err)
     res.status(500).json({ error: 'Redeem failed' })
+  }
+})
+
+// ─── POST /api/scan/redeem-points ───────────────────────────
+// 멤버십 포인트 차감 (staff가 points 금액 입력 후 redeem)
+router.post('/redeem-points', authMiddleware, async (req, res) => {
+  try {
+    const { customer_id, points } = req.body
+    if (!customer_id || !points || points <= 0) {
+      return res.status(400).json({ error: 'customer_id and positive points required' })
+    }
+
+    const { data: customer, error: findErr } = await supabase
+      .from('customers')
+      .select('id, name, device_token, card_id, loyalty_cards(card_type, reward_desc)')
+      .eq('id', customer_id)
+      .eq('business_id', req.business.id)
+      .single()
+
+    if (findErr || !customer) return res.status(404).json({ error: 'Customer not found' })
+
+    const cardType = customer.loyalty_cards?.card_type || 'stamp'
+    if (cardType !== 'membership') {
+      return res.status(400).json({ error: 'Points redemption is only available for membership cards' })
+    }
+
+    // Calculate total available points (stamps × 100 − already redeemed)
+    const [{ count: totalStamps }, { data: prevRedemptions }] = await Promise.all([
+      supabase.from('stamps').select('id', { count: 'exact' }).eq('customer_id', customer_id),
+      supabase.from('redemptions').select('points_redeemed').eq('customer_id', customer_id).eq('redeem_type', 'points')
+    ])
+
+    const totalEarned  = (totalStamps || 0) * 100
+    const totalSpent   = (prevRedemptions || []).reduce((sum, r) => sum + (r.points_redeemed || 0), 0)
+    const pointsBalance = totalEarned - totalSpent
+
+    if (points > pointsBalance) {
+      return res.status(400).json({
+        error: `Not enough points. Balance: ${pointsBalance} pts, requested: ${points} pts.`
+      })
+    }
+
+    // Record redemption
+    await supabase.from('redemptions').insert({
+      customer_id,
+      card_id:          customer.card_id,
+      points_redeemed:  points,
+      redeem_type:      'points'
+    })
+
+    const newBalance = pointsBalance - points
+
+    // Push notification
+    await pushService.sendToCustomer(
+      customer,
+      `${points} points redeemed! Remaining balance: ${newBalance} pts.`,
+      req.business.name
+    )
+
+    res.json({
+      success:      true,
+      points_spent: points,
+      new_balance:  newBalance,
+      message:      `${points} pts redeemed for ${customer.name}. New balance: ${newBalance} pts.`
+    })
+  } catch (err) {
+    console.error('Redeem points error:', err)
+    res.status(500).json({ error: 'Points redemption failed' })
   }
 })
 
