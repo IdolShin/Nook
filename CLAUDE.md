@@ -274,9 +274,9 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 ## Todo List
 
 ### 🔴 Urgent
-- [ ] **Run `supabase_migration_session32.sql`** — adds stamps_redeemed/points_redeemed/redeem_type to redemptions table (required before bat files)
-- [ ] **Run `push_session32_backend.bat`** — deploys scan.js, customers.js, coupons.js, googleWallet.js
-- [ ] **Run `push_session32_frontend.bat`** — deploys scanner/page.tsx, customers/page.tsx, pass/[barcode]/page.tsx, MiniCardArt.tsx, api.ts
+- [ ] **Run `supabase_migration_session34.sql`** — adds user_id, unique_key, birthday_mmdd + relaxes name/phone NOT NULL
+- [ ] **`git push origin main`** (backend: commit `b1260bb`, frontend: commit `3b4710a`) — Railway auto-deploy
+- [ ] **Run `supabase_migration_session32.sql`** — (if not yet done) adds stamps_redeemed/points_redeemed/redeem_type
 - [ ] **Resend API key** — add to Railway backend env vars
 - [ ] **Coupon → Google Wallet** — real connection test end-to-end
 - [x] **Edit Card form** ✅ Done (Session 6)
@@ -390,6 +390,92 @@ git push origin main
 ---
 
 ## Change Log
+
+### 2026-05-30 (Session 34 — Push 시간 제한 + 고객 등록 간소화 + unique_key 시스템)
+
+**백엔드 (IdolShin/Nook) — 2개 파일 변경 + 신규 SQL:**
+
+- **`src/services/push.js`** — ET 동부시간 발송 제한
+  - `isWithinEtHours()`: 현재 ET 시간이 8am-8pm인지 판별 (Intl.DateTimeFormat)
+  - `getNextEt8amUTC()`: 다음 ET 8am을 UTC Date로 계산 (EDT/EST DST 자동 처리)
+  - broadcast route: 시간 외 요청 시 `node-schedule`로 예약 후 `{ scheduled: true, scheduled_for_et }` 반환
+  - 시간 내 요청은 기존 즉시 발송 그대로
+
+- **`src/routes/customers.js`** — 고객 등록 간소화 + unique_key
+  - `POST /api/customers/register`: `user_id` 필수, `birthday_mmdd` 옵션(MM-DD), name/phone 불필요
+  - `unique_key` 자동 생성: 비즈 이름 앞 3자(영숫자 대문자) + 5자리 숫자 (e.g. NOO12345), 충돌 시 재시도
+  - `GET /api/customers`: `user_id`, `unique_key`, `birthday_mmdd` 포함 반환
+  - `GET /api/customers/lookup`: `type=unique_key` 지원 추가
+
+- **`supabase_migration_session34.sql`** — DB 마이그레이션
+  - `user_id TEXT`, `unique_key TEXT`, `birthday_mmdd VARCHAR(5)` 컬럼 추가
+  - `customers_unique_key_idx` unique index 생성
+  - `name`, `phone` NOT NULL 제거 (기존 데이터 호환)
+  - 기존 고객 `user_id` backfill (user_id = name)
+  - **⚠️ 아직 미실행 — Supabase Dashboard SQL Editor에서 실행 필요**
+
+**프론트엔드 (IdolShin/nook-admin) — 3개 파일 변경:**
+
+- **`src/app/(marketing)/join/[slug]/page.tsx`** — 고객 등록 페이지 전면 개편
+  - 이름/전화번호 필드 제거
+  - `User ID` 필드 추가 (필수, 이름/닉네임)
+  - 생일: date picker → 월/일 드롭다운 2개 (년도 없음, MM-DD 형식)
+  - 성공 화면: 디지털 카드 미리보기 (비즈 이름, UserID, 생일 월일, QR, unique_key)
+  - unique_key 복사 버튼 포함
+
+- **`src/lib/api.ts`** — 타입 + 함수 업데이트
+  - `ApiCustomer`: `user_id`, `unique_key`, `birthday_mmdd` 추가, `phone` 옵션으로 변경
+  - `BroadcastResult`: `scheduled`, `scheduled_for`, `scheduled_for_et`, `message` 필드 추가
+  - `registerCustomer()`: `user_id` + `birthday_mmdd` 기반으로 시그니처 변경
+
+- **`src/app/(admin)/push/page.tsx`** — scheduled 응답 처리
+  - 예약된 경우: "예약됨 · Jun 1 8:00 AM (동부시간...)" 표시
+
+**⚠️ 배포 전 필수:**
+1. `supabase_migration_session34.sql` → Supabase Dashboard SQL Editor에서 실행
+2. 백엔드: `git push origin main` (커밋 `b1260bb`)
+3. 프론트엔드: `git push origin main` (커밋 `3b4710a`)
+
+---
+
+### 2026-05-28 (Session 33 — Contact 페이지 버튼 추가 + 파일 복구)
+
+**프론트엔드 (IdolShin/nook-admin) — 1개 파일 변경:**
+
+- **`src/app/(marketing)/contact/page.tsx`** — 두 가지 수정
+  - 파일 하단 footer/closing 태그 잘림 현상 복구 (commit `dce17bd`)
+  - Contact 내비에 "Homepage" 버튼 추가 — "View Pricing" 옆에 나란히, KO/EN 바이링귀얼 (`홈페이지로 / Homepage`) (commit `195c581`)
+
+**Verified:** Railway 자동 배포 ✅
+
+---
+
+### 2026-05-25 (Session 31 — 플랜 배너 + Upgrade 페이지 + 쿠폰/카드 편집삭제 + Topbar 정리)
+
+**프론트엔드 (IdolShin/nook-admin) — 4개 파일 변경:**
+
+- **`src/app/(admin)/upgrade/page.tsx`** — NEW: Upgrade 전용 페이지
+  - Basic/Pro/Premium 플랜 비교표 + 업그레이드 CTA 버튼
+  - 각 플랜 컬러 배지 (Basic=노란색, Pro=초록색, Premium=파란색)
+
+- **`src/app/(admin)/cards/page.tsx`** + **`src/app/(admin)/push/page.tsx`** — 플랜 배너 UI
+  - 현재 플랜(Basic/Pro)에 따른 상단 배너 표시 (제한 안내 + 업그레이드 링크)
+  - Nook Cafe 테스트 계정 premium 플랜으로 설정
+
+- **`src/components/layout/Topbar.tsx`** + **`src/lib/data.ts`** — Topbar 간소화
+  - 전체 검색바 숨김 (비어있어서 불필요)
+  - 비즈니스 필터 드롭다운 → 슈퍼어드민 전용으로 제한
+  - "All businesses" → "All"로 텍스트 단축
+
+- **`src/app/(admin)/coupons/page.tsx`** + **`src/app/(admin)/cards/page.tsx`** + **`src/components/cards/MiniCardArt.tsx`** + **`src/lib/api.ts`** — 편집/삭제 기능 + 타입별 디자인
+  - 쿠폰: 편집 모달, 삭제 확인, 유효기간(valid_days) 표시
+  - 카드: 편집 모달, 삭제 확인
+  - MiniCardArt: 카드 타입별 월렛 디자인 분기 (멤버십=보라색 포인트 UI, 스탬프=초록색 스탬프 그리드)
+  - api.ts: `updateCoupon()`, `deleteCoupon()`, `deleteCard()` 함수 추가
+
+**Verified:** Railway 자동 배포 ✅ (commits `a24a8cc`, `24ba57e`, `ec92ef5`)
+
+---
 
 ### 2026-05-25 (Session 32 — 멤버십 포인트 시스템 + 쿠폰 패스 페이지 + 고객 페이지 개편)
 
@@ -958,33 +1044,4 @@ git push origin main
   - **Root cause**: CM6 injection for this file appended to the file instead of replacing it, resulting in TWO complete `export default function RootLayout` definitions concatenated:
     1. First (wrong): `Plus_Jakarta_Sans` font + encoding corruption in title (`"Nook â Loyalty Platform"`)
     2. Second (correct): `Inter` font + same encoding corruption
-  - **Symptoms**: Duplicate `<meta charset>` + `<meta viewport>` tags in HTML, three font class variables on `<html>` element (including unexpected `sora_f0ca33ab`), all CSS files reporting 0 parsed rules via CSSOM, homepage completely unstyled
-  - **Fix**: Replaced entire file via `execCommand('selectAll')` + `execCommand('insertText')` with clean 65-line single-definition version using `Inter` + `JetBrains_Mono` fonts, no encoding corruption
-  - Commit `5c64877`: `fix: layout.tsx - remove duplicate RootLayout, restore single Inter-font definition`
-
-**Verified post-fix:**
-- Homepage: dark green hero, stamp card mockup, stat cards (94%/+38%/10분), "왜 손님들은 다시 올까요?" section — all styled ✅
-- Admin dashboard: KPI cards, line chart, donut chart, recent signups feed — all working ✅
-- Railway auto-deploy triggered from `main` branch push ✅
-
----
-
-### 2026-05-09 (Session 15 — Fix Truncated Files + Railway Build Recovery)
-
-**Root cause:** Session 14's CM6 injection commits silently truncated three files, causing Railway builds to fail with "Parsing ecmascript source code failed". The last successful Railway build was the "feat: integrate SplashScreen into layout with Sora font" commit (all subsequent builds failed). Also `layout.tsx` had a `bottomNavH` used-before-declaration TypeScript error introduced by the Session 14 scroll-lock fix.
-
-**Frontend (IdolShin/nook-admin) — 4 files fixed:**
-
-- **`src/lib/api.ts`** — Restored ApiCoupon + ApiCouponPass interfaces (commit `fix: api.ts - restore complete ApiCoupon + ApiCouponPass interfaces`)
-  - File was truncated at line 305: `ApiCoupon { id: string;` (just spaces after)
-  - Fix: spliced correct tail content after the `id: string;` line via CM6 dispatch
-  - GitHub confirmed: 334 lines, 11641 bytes
-
-- **`src/components/SplashScreen.tsx`** — Restored closing JSX (commit `fix: SplashScreen.tsx - restore complete closing JSX (was truncated)`)
-  - File truncated at line 576 (just spaces), missing: `</div>` (nk-markwrap), nk-word/nk-lockup wordmark div, `</div>` (nk-stage), `</div>` (nk-splash), `</>`, `);`, `}`, `export default SplashScreen;`
-  - Fix: fetched original commit `22ef043` via GitHub API, found the nk-r2 span as common anchor point, spliced original's tail onto current head
-  - GitHub confirmed: 599 lines
-
-- **`src/app/(admin)/register/page.tsx`** — Restored complete 391-line version (commit `fix: register/page.tsx - restore complete 391-line version with Suspense + API`)
-  - File truncated to 179 lines on GitHub (severely broken mid-JSX)
-  - Fix: fetched Session 12 commit `9b2f4c3` (Suspense boundary version — complete, has registerCustomer + handleRegister + Suspense wr
+  - **Symptoms**: Duplicate `<meta charset>` + `<meta viewport>` tags in HTML, three font cla

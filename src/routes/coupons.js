@@ -153,6 +153,13 @@ router.post('/redeem', async (req, res) => {
 
     if (pass.status === 'expired' || new Date(pass.expires_at) < new Date()) {
       await supabase.from('coupon_passes').update({ status: 'expired' }).eq('id', pass.id)
+      // Sync expired state to Google Wallet
+      ;(async () => {
+        try {
+          const { updateCouponPassStatus } = require('../services/googleWallet')
+          await updateCouponPassStatus(pass.id, 'EXPIRED')
+        } catch (e) { console.error('[Wallet] expire update error:', e.message) }
+      })()
       return res.status(400).json({
         error: 'expired',
         message: 'This coupon has expired.',
