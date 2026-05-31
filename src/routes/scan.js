@@ -22,7 +22,7 @@ router.post('/', authMiddleware, async (req, res) => {
       .from('customers')
       .select(`
         id, name, phone, wallet_type, device_token, card_id,
-        loyalty_cards ( name, card_type, goal_stamps, reward_desc, color )
+        loyalty_cards ( name, card_type, goal_stamps, reward_desc, reward_tiers, color )
       `)
       .eq(field, code)
       .eq('business_id', req.business.id)
@@ -139,6 +139,7 @@ router.post('/', authMiddleware, async (req, res) => {
       customer_name:  customer.name,
       card_type:      cardType,
       reward_desc:    customer.loyalty_cards?.reward_desc || null,
+      reward_tiers:   isMembership ? (customer.loyalty_cards?.reward_tiers || []) : null,
       // Membership-specific
       points_earned:  isMembership ? 100 : null,
       total_points:   totalPoints,
@@ -241,7 +242,7 @@ router.post('/redeem', authMiddleware, async (req, res) => {
 // 멤버십 포인트 차감 (staff가 points 금액 입력 후 redeem)
 router.post('/redeem-points', authMiddleware, async (req, res) => {
   try {
-    const { customer_id, points } = req.body
+    const { customer_id, points, reward_label } = req.body
     if (!customer_id || !points || points <= 0) {
       return res.status(400).json({ error: 'customer_id and positive points required' })
     }
@@ -281,7 +282,8 @@ router.post('/redeem-points', authMiddleware, async (req, res) => {
       customer_id,
       card_id:          customer.card_id,
       points_redeemed:  points,
-      redeem_type:      'points'
+      redeem_type:      'points',
+      ...(reward_label ? { reward_label } : {})
     })
 
     const newBalance = pointsBalance - points

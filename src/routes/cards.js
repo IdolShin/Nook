@@ -29,7 +29,7 @@ router.get('/', async (req, res) => {
 // ì ì¹´ë ë§ë¤ê¸° (superadminì body.bizId ë¡ ë¤ë¥¸ ê°ê²ì ì¹´ë ìì± ê°ë¥)
 router.post('/', async (req, res) => {
   try {
-    const { name, card_type, color, goal_stamps, reward_desc, bizId: bodyBizId } = req.body
+    const { name, card_type, color, goal_stamps, reward_desc, reward_tiers, bizId: bodyBizId } = req.body
 
     if (!name || !card_type) {
       return res.status(400).json({ error: 'name and card_type required' })
@@ -82,7 +82,8 @@ router.post('/', async (req, res) => {
         card_type,
         color: color || '#1D9E75',
         goal_stamps: goal_stamps || 10,
-        reward_desc
+        reward_desc,
+        reward_tiers: Array.isArray(reward_tiers) ? reward_tiers : []
       })
       .select()
       .single()
@@ -99,12 +100,14 @@ router.post('/', async (req, res) => {
 // ì¹´ë ìì  (superadminì body.bizId ë¡ ìì ê¶ ê²ì¦ ì°í ê°ë¥)
 router.patch('/:id', async (req, res) => {
   try {
-    const { name, color, goal_stamps, reward_desc, is_active, bizId: bodyBizId } = req.body
+    const { name, color, goal_stamps, reward_desc, reward_tiers, is_active, bizId: bodyBizId } = req.body
     const bizId = (req.business.is_superadmin && bodyBizId) ? bodyBizId : req.business.id
 
     const { data, error } = await supabase
       .from('loyalty_cards')
-      .update({ name, color, goal_stamps, reward_desc, is_active })
+      .update({ name, color, goal_stamps, reward_desc,
+        ...(Array.isArray(reward_tiers) ? { reward_tiers } : {}),
+        is_active })
       .eq('id', req.params.id)
       .eq('business_id', bizId)
       .select()
