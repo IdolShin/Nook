@@ -135,8 +135,10 @@ router.post('/', authMiddleware, async (req, res) => {
 
     res.json({
       success:        true,
+      customer_id:    customer.id,
       customer_name:  customer.name,
       card_type:      cardType,
+      reward_desc:    customer.loyalty_cards?.reward_desc || null,
       // Membership-specific
       points_earned:  isMembership ? 100 : null,
       total_points:   totalPoints,
@@ -144,6 +146,7 @@ router.post('/', authMiddleware, async (req, res) => {
       prev_stamps:    isMembership ? null : prevCurrent,
       new_stamps:     isMembership ? null : (isReward ? goal : newCurrent),
       goal_stamps:    isMembership ? null : goal,
+      rewards_earned: isMembership ? null : Math.floor(newTotal / goal),
       reward_ready:   rewardReady,
       scan_type:      scan_type || 'qr',
       message:        isMembership
@@ -175,20 +178,40 @@ router.post('/redeem', authMiddleware, async (req, res) => {
     if (findErr || !customer) return res.status(404).json({ error: 'Customer not found' })
 
     // Check they actually have a reward ready
-    const { count } = await supabase
+    const { count: stampCount } = await supabase
       .from('stamps')
       .select('id', { count: 'exact' })
       .eq('customer_id', customer_id)
 
-    const goal    = customer.loyalty_cards?.goal_stamps || 10
-    const current = (count || 0) % goal
+    const goal         = customer.loyalty_cards?.goal_stamps || 10
+    const rewardDesc   = customer.loyalty_cards?.reward_desc || 'Reward'
+    const total        = stampCount || 0
+    const current      = total % goal
+    const rewardsEarned = Math.floor(total / goal)
+
     if (current !== 0) {
       return res.status(400).json({
         error: `Not enough stamps. Customer has ${current}/${goal}.`
       })
     }
+    if (rewardsEarned === 0) {
+      return res.status(400).json({ error: 'No rewards earned yet.' })
+    }
 
-    // Record redemption with stamp count
+    // ── Prevent double-redeem in the same cycle ───────────────
+    const { count: redeemsCount } = await supabase
+      .from('redemptions')
+      .select('id', { count: 'exact' })
+      .eq('customer_id', customer_id)
+      .eq('redeem_type', 'stamp')
+
+    if ((redeemsCount || 0) >= rewardsEarned) {
+      return res.status(400).json({
+        error: `Reward already redeemed for this cycle. Collect ${goal} more stamps to earn the next reward.`
+      })
+    }
+
+    // Record redemption
     await supabase.from('redemptions').insert({
       customer_id,
       card_id:         customer.card_id,
@@ -199,13 +222,14 @@ router.post('/redeem', authMiddleware, async (req, res) => {
     // Push: confirm redemption
     await pushService.sendToCustomer(
       customer,
-      `Your free ${customer.loyalty_cards?.reward_desc || 'reward'} has been redeemed! Card reset to 0/${goal}. See you next time!`,
+      `Your "${rewardDesc}" reward has been redeemed! Collect ${goal} more stamps to earn the next one. See you next time!`,
       req.business.name
     )
 
     res.json({
-      success: true,
-      message: `Reward redeemed for ${customer.name}. Card reset.`
+      success:     true,
+      reward_desc: rewardDesc,
+      message:     `"${rewardDesc}" redeemed for ${customer.name}. Stamp card reset to 0/${goal}.`
     })
   } catch (err) {
     console.error('Redeem error:', err)
