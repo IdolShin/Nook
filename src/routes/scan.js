@@ -11,12 +11,15 @@ const { updateStamps, updateMembershipPoints } = require('../services/googleWall
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { code, scan_type } = req.body
-    // scan_type: 'qr' | 'barcode' | 'manual'
+    // scan_type: 'qr' | 'barcode' | 'unique_key' | 'manual'
 
     if (!code) return res.status(400).json({ error: 'code required' })
 
-    // 1. Find customer by QR or barcode
-    const field = scan_type === 'barcode' ? 'barcode' : 'qr_code'
+    // 1. Find customer — match by QR code, barcode, OR unique_key.
+    //    unique_key is alphanumeric (e.g. NOO12345) and stored uppercase,
+    //    so manual entry works regardless of which identifier staff types.
+    const trimmed = String(code).trim()
+    const upper = trimmed.toUpperCase()
 
     const { data: customer, error: findErr } = await supabase
       .from('customers')
@@ -24,7 +27,7 @@ router.post('/', authMiddleware, async (req, res) => {
         id, name, phone, wallet_type, device_token, card_id,
         loyalty_cards ( name, card_type, goal_stamps, reward_desc, reward_tiers, color )
       `)
-      .eq(field, code)
+      .or(`qr_code.eq.${trimmed},barcode.eq.${trimmed},unique_key.eq.${upper}`)
       .eq('business_id', req.business.id)
       .single()
 
