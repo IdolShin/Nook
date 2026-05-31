@@ -1,5 +1,50 @@
 const webpush = require('web-push')
 const supabase = require('../db/supabase')
+const schedule = require('node-schedule')
+
+// ─── ET business-hours helpers ────────────────────────────────
+function getEtHour(date = new Date()) {
+  return parseInt(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      hour: 'numeric',
+      hour12: false,
+    }).format(date),
+    10
+  )
+}
+
+function isWithinEtHours() {
+  const h = getEtHour()
+  return h >= 8 && h < 20
+}
+
+// Returns the next UTC Date when ET will be exactly 8:00 AM
+function getNextEt8amUTC() {
+  const now = new Date()
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+
+  const etDateStr = (d) =>
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(d)
+
+  const toISO = (str) => { const [m, d, y] = str.split('/'); return `${y}-${m}-${d}` }
+
+  const candidates = []
+  for (const d of [now, tomorrow]) {
+    const iso = toISO(etDateStr(d))
+    for (const utcH of [12, 13]) { // 12 UTC = 8am EDT, 13 UTC = 8am EST
+      const candidate = new Date(`${iso}T${String(utcH).padStart(2, '0')}:00:00.000Z`)
+      if (candidate > now && getEtHour(candidate) === 8) candidates.push(candidate)
+    }
+  }
+
+  candidates.sort((a, b) => a - b)
+  return candidates[0] || new Date(now.getTime() + 12 * 60 * 60 * 1000)
+}
+// ─────────────────────────────────────────────────────────────
 
 // Initialize VAPID keys
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -132,6 +177,45 @@ router.post('/broadcast', authMiddleware, async (req, res) => {
     const { message, customer_ids } = req.body
     if (!message) return res.status(400).json({ error: 'message required' })
     if (message.length > 140) return res.status(400).json({ error: 'Message max 140 chars' })
+
+    // ─── ET business-hours gate (8am–8pm Eastern) ────────────
+    // Compute effectiveIds early so the scheduled closure captures the right value
+    let effectiveIdsForSchedule = customer_ids || null
+    if (!req.business.is_superadmin) {
+      const planForSchedule = (req.business.plan || 'basic').toLowerCase()
+      if (planForSchedule !== 'premium') effectiveIdsForSchedule = null
+    }
+
+    if (!isWithinEtHours()) {
+      const nextTime = getNextEt8amUTC()
+      const bizId   = req.business.id
+      const bizName = req.business.name
+      const ids     = effectiveIdsForSchedule
+
+      schedule.scheduleJob(nextTime, async () => {
+        try {
+          await pushService.broadcastToBusiness(bizId, message, bizName, ids)
+          console.log(`[Push] Scheduled broadcast sent for biz ${bizId} at ${nextTime.toISOString()}`)
+        } catch (err) {
+          console.error('[Push] Scheduled broadcast failed:', err.message)
+        }
+      })
+
+      const etStr = nextTime.toLocaleString('en-US', {
+        timeZone: 'America/New_York',
+        month: 'short', day: 'numeric',
+        hour: 'numeric', minute: '2-digit',
+        hour12: true,
+      })
+
+      return res.json({
+        scheduled: true,
+        scheduled_for: nextTime.toISOString(),
+        scheduled_for_et: etStr,
+        message: `현재는 발송 시간이 아닙니다 (동부시간 오전 8시~오후 8시). 예약 완료: ${etStr} ET`,
+      })
+    }
+    // ─────────────────────────────────────────────────────────
 
     // ─── Plan enforcement: push frequency ────────────────────
     if (!req.business.is_superadmin) {

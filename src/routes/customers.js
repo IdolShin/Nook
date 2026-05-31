@@ -6,17 +6,27 @@ const supabase = require('../db/supabase')
 const { authMiddleware } = require('../middleware/auth')
 
 // ─── POST /api/customers/register ────────────────────────────
-// 고객 카드 등록 (Step 2 랜딩페이지에서 호출)
-// Public endpoint — no auth needed (customer fills in their info)
+// 고객 카드 등록 (고객이 직접 등록하는 public endpoint)
+// Required: card_id, user_id, consent_push
+// Optional:  birthday_mmdd (MM-DD), wallet_type
 router.post('/register', async (req, res) => {
   try {
-    const { card_id, name, phone, birthday, wallet_type, consent_push, consent_points } = req.body
+    const {
+      card_id, user_id, birthday_mmdd, wallet_type, consent_push,
+      // Legacy fields accepted but not required
+      name, phone, birthday, consent_points
+    } = req.body
 
-    if (!card_id || !name || !phone) {
-      return res.status(400).json({ error: 'card_id, name, phone required' })
+    if (!card_id || !user_id) {
+      return res.status(400).json({ error: 'card_id and user_id are required' })
     }
-    if (!consent_push || !consent_points) {
-      return res.status(400).json({ error: 'Both consents required' })
+    if (!consent_push) {
+      return res.status(400).json({ error: 'Marketing consent required' })
+    }
+
+    // Validate birthday_mmdd if provided (must be MM-DD)
+    if (birthday_mmdd && !/^\d{2}-\d{2}$/.test(birthday_mmdd)) {
+      return res.status(400).json({ error: 'birthday_mmdd must be in MM-DD format (e.g. 03-15)' })
     }
 
     // Check card exists and is active
@@ -32,7 +42,7 @@ router.post('/register', async (req, res) => {
     // ─── Plan enforcement: customer count limit ───────────────
     const { data: biz } = await supabase
       .from('businesses')
-      .select('plan, is_superadmin')
+      .select('plan, is_superadmin, name')
       .eq('id', card.business_id)
       .single()
 
@@ -55,33 +65,47 @@ router.post('/register', async (req, res) => {
       }
     }
 
-    // Check duplicate phone for same card
-    const { data: existing } = await supabase
-      .from('customers')
-      .select('id')
-      .eq('card_id', card_id)
-      .eq('phone', phone)
-      .single()
+    // ─── Generate unique_key: BIZ3 + 5 digits ────────────────
+    // e.g. "NOO12345" for "Nook Cafe"
+    const bizPrefix = (biz?.name || 'NOO')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .toUpperCase()
+      .slice(0, 3)
+      .padEnd(3, 'X')
 
-    if (existing) return res.status(409).json({ error: 'Already registered with this phone number' })
+    let unique_key = null
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const digits = String(Math.floor(10000 + Math.random() * 90000))
+      const candidate = `${bizPrefix}${digits}`
+      const { data: collision } = await supabase
+        .from('customers').select('id').eq('unique_key', candidate).single()
+      if (!collision) { unique_key = candidate; break }
+    }
+    if (!unique_key) unique_key = `${bizPrefix}${Date.now().toString().slice(-5)}`
 
     // Generate unique QR code and 8-digit barcode
     const qr_code = uuidv4()
     const barcode  = String(Math.floor(10000000 + Math.random() * 90000000))
 
+    // Use user_id as the display name (backward-compat: name = user_id)
+    const displayName = (name || user_id).trim()
+
     const { data: customer, error } = await supabase
       .from('customers')
       .insert({
-        business_id: card.business_id,
+        business_id:  card.business_id,
         card_id,
-        name,
-        phone,
-        ...(birthday ? { birthday } : {}),
-        wallet_type: wallet_type || 'unknown',
+        user_id:      user_id.trim(),
+        name:         displayName,
+        ...(phone          ? { phone: phone.trim() } : {}),
+        ...(birthday_mmdd  ? { birthday_mmdd }       : {}),
+        ...(birthday       ? { birthday }             : {}), // legacy
+        unique_key,
+        wallet_type:  wallet_type || 'unknown',
         qr_code,
         barcode,
         consent_push,
-        consent_points
+        consent_points: consent_points || false
       })
       .select()
       .single()
@@ -97,14 +121,16 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({
       customer: {
-        id:       customer.id,
-        name:     customer.name,
-        qr_code:  customer.qr_code,
-        barcode:  customer.barcode,
-        card_id:  customer.card_id
+        id:            customer.id,
+        user_id:       customer.user_id,
+        unique_key:    customer.unique_key,
+        birthday_mmdd: customer.birthday_mmdd,
+        qr_code:       customer.qr_code,
+        barcode:       customer.barcode,
+        card_id:       customer.card_id
       },
-      qr_image: qrImageBase64,   // shown on customer's screen / sent to wallet
-      message: 'Registration successful! Check your wallet.'
+      qr_image: qrImageBase64,
+      message: 'Registration successful!'
     })
   } catch (err) {
     console.error('Register customer error:', err)
@@ -119,7 +145,7 @@ router.get('/', authMiddleware, async (req, res) => {
     const { data: customers, error: custErr } = await supabase
       .from('customers')
       .select(`
-        id, name, phone, qr_code, barcode, wallet_type, card_id, created_at,
+        id, name, user_id, unique_key, phone, qr_code, barcode, wallet_type, card_id, created_at, birthday_mmdd,
         loyalty_cards ( card_type, goal_stamps, reward_desc )
       `)
       .eq('business_id', req.business.id)
@@ -141,13 +167,16 @@ router.get('/', authMiddleware, async (req, res) => {
     }
 
     const result = customers.map(c => {
-      const goal       = c.loyalty_cards?.goal_stamps || 10
-      const cardType   = c.loyalty_cards?.card_type || 'stamp'
-      const total      = counts[c.id] || 0
+      const goal         = c.loyalty_cards?.goal_stamps || 10
+      const cardType     = c.loyalty_cards?.card_type || 'stamp'
+      const total        = counts[c.id] || 0
       const isMembership = cardType === 'membership'
       return {
         id:             c.id,
         name:           c.name,
+        user_id:        c.user_id || c.name,
+        unique_key:     c.unique_key,
+        birthday_mmdd:  c.birthday_mmdd,
         phone:          c.phone,
         qr_code:        c.qr_code,
         barcode:        c.barcode,
@@ -181,12 +210,14 @@ router.get('/lookup', authMiddleware, async (req, res) => {
 
     if (!code) return res.status(400).json({ error: 'code required' })
 
-    const field = type === 'barcode' ? 'barcode' : 'qr_code'
+    const field = type === 'barcode' ? 'barcode'
+                : type === 'unique_key' ? 'unique_key'
+                : 'qr_code'
 
     const { data: customer, error } = await supabase
       .from('customers')
       .select(`
-        id, name, phone, wallet_type, qr_code, barcode, card_id,
+        id, name, user_id, unique_key, birthday_mmdd, phone, wallet_type, qr_code, barcode, card_id,
         loyalty_cards ( name, card_type, goal_stamps, reward_desc, color )
       `)
       .eq(field, code)
@@ -211,6 +242,9 @@ router.get('/lookup', authMiddleware, async (req, res) => {
       customer: {
         id:            customer.id,
         name:          customer.name,
+        user_id:       customer.user_id || customer.name,
+        unique_key:    customer.unique_key,
+        birthday_mmdd: customer.birthday_mmdd,
         wallet_type:   customer.wallet_type,
         card:          customer.loyalty_cards,
         current_stamps: current,
