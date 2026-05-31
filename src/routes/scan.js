@@ -5,9 +5,7 @@ const { authMiddleware } = require('../middleware/auth')
 const { pushService } = require('../services/push')
 const { updateStamps, updateMembershipPoints } = require('../services/googleWallet')
 
-// ─── POST /api/scan ──────────────────────────────────────────
-// 핵심 엔드포인트: QR/바코드 스캔 → 스탬프 적립
-// Called by: Scanner App (Step 3) after reading QR or barcode
+// POST /api/scan  — QR/barcode/unique_key scan -> add stamp
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { code, scan_type } = req.body
@@ -16,10 +14,26 @@ router.post('/', authMiddleware, async (req, res) => {
     if (!code) return res.status(400).json({ error: 'code required' })
 
     // 1. Find customer — match by QR code, barcode, OR unique_key.
-    //    unique_key is alphanumeric (e.g. NOO12345) and stored uppercase,
-    //    so manual entry works regardless of which identifier staff types.
     const trimmed = String(code).trim()
     const upper = trimmed.toUpperCase()
+
+    const orParts = [
+      `qr_code.eq.${trimmed}`,
+      `barcode.eq.${trimmed}`,
+      `unique_key.eq.${upper}`,
+    ]
+
+    // If staff typed ONLY digits, prepend this business's unique_key prefix.
+    // Must match the unique_key generation rule in customers.js:
+    // first 3 alphanumerics of the business name, uppercase, padded to 3 with 'X'.
+    if (/^\d+$/.test(trimmed)) {
+      const prefix = (req.business.name || 'NOO')
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .toUpperCase()
+        .slice(0, 3)
+        .padEnd(3, 'X')
+      orParts.push(`unique_key.eq.${prefix}${trimmed}`)
+    }
 
     const { data: customer, error: findErr } = await supabase
       .from('customers')
@@ -27,7 +41,7 @@ router.post('/', authMiddleware, async (req, res) => {
         id, name, phone, wallet_type, device_token, card_id,
         loyalty_cards ( name, card_type, goal_stamps, reward_desc, reward_tiers, color )
       `)
-      .or(`qr_code.eq.${trimmed},barcode.eq.${trimmed},unique_key.eq.${upper}`)
+      .or(orParts.join(','))
       .eq('business_id', req.business.id)
       .single()
 
@@ -61,8 +75,6 @@ router.post('/', authMiddleware, async (req, res) => {
     const cardType   = customer.loyalty_cards?.card_type || 'stamp'
     const isMembership = cardType === 'membership'
 
-    // Membership: cumulative points (100 pts per scan, never resets)
-    // Stamp/cashback/coupon: cycle-based with goal
     const newCurrent = isMembership ? null : (newTotal % goal)
     const isReward   = isMembership ? false : (newCurrent === 0)
     const totalPoints = isMembership ? newTotal * 100 : null
@@ -72,7 +84,6 @@ router.post('/', authMiddleware, async (req, res) => {
     if (!isMembership && isReward) {
       rewardReady = true
 
-      // Auto-issue stamp_complete trigger coupons (fire-and-forget)
       ;(async () => {
         try {
           const { data: bonusCoupons } = await supabase
@@ -94,7 +105,7 @@ router.post('/', authMiddleware, async (req, res) => {
             if (existing) continue
 
             const barcode    = String(Math.floor(100000000000 + Math.random() * 900000000000))
-            const expiresAt  = new Date(Date.now() + (coupon.valid_days || 30) * 86_400_000)
+            const expiresAt  = new Date(Date.now() + (coupon.valid_days || 30) * 86400000)
 
             await supabase.from('coupon_passes').insert({
               coupon_id:   coupon.id,
@@ -113,10 +124,9 @@ router.post('/', authMiddleware, async (req, res) => {
       })()
     }
 
-    // 6. Sync Google Wallet (fire-and-forget — don't delay the scan response)
+    // 6. Sync Google Wallet (fire-and-forget)
     if (customer.wallet_type === 'google') {
       if (isMembership) {
-        // Membership: update wallet to show cumulative points
         updateMembershipPoints(customer.id, totalPoints).catch(err =>
           console.error('[Google Wallet] membership points sync failed:', err.message)
         )
@@ -143,10 +153,8 @@ router.post('/', authMiddleware, async (req, res) => {
       card_type:      cardType,
       reward_desc:    customer.loyalty_cards?.reward_desc || null,
       reward_tiers:   isMembership ? (customer.loyalty_cards?.reward_tiers || []) : null,
-      // Membership-specific
       points_earned:  isMembership ? 100 : null,
       total_points:   totalPoints,
-      // Stamp-specific (null for membership)
       prev_stamps:    isMembership ? null : prevCurrent,
       new_stamps:     isMembership ? null : (isReward ? goal : newCurrent),
       goal_stamps:    isMembership ? null : goal,
@@ -165,8 +173,7 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 })
 
-// ─── POST /api/scan/redeem ───────────────────────────────────
-// 리워드 사용 처리 (직원이 "Redeem" 버튼 누를 때)
+// POST /api/scan/redeem — redeem stamp reward
 router.post('/redeem', authMiddleware, async (req, res) => {
   try {
     const { customer_id } = req.body
@@ -181,7 +188,6 @@ router.post('/redeem', authMiddleware, async (req, res) => {
 
     if (findErr || !customer) return res.status(404).json({ error: 'Customer not found' })
 
-    // Check they actually have a reward ready
     const { count: stampCount } = await supabase
       .from('stamps')
       .select('id', { count: 'exact' })
@@ -194,15 +200,12 @@ router.post('/redeem', authMiddleware, async (req, res) => {
     const rewardsEarned = Math.floor(total / goal)
 
     if (current !== 0) {
-      return res.status(400).json({
-        error: `Not enough stamps. Customer has ${current}/${goal}.`
-      })
+      return res.status(400).json({ error: `Not enough stamps. Customer has ${current}/${goal}.` })
     }
     if (rewardsEarned === 0) {
       return res.status(400).json({ error: 'No rewards earned yet.' })
     }
 
-    // ── Prevent double-redeem in the same cycle ───────────────
     const { count: redeemsCount } = await supabase
       .from('redemptions')
       .select('id', { count: 'exact' })
@@ -210,12 +213,9 @@ router.post('/redeem', authMiddleware, async (req, res) => {
       .eq('redeem_type', 'stamp')
 
     if ((redeemsCount || 0) >= rewardsEarned) {
-      return res.status(400).json({
-        error: `Reward already redeemed for this cycle. Collect ${goal} more stamps to earn the next reward.`
-      })
+      return res.status(400).json({ error: `Reward already redeemed for this cycle. Collect ${goal} more stamps to earn the next reward.` })
     }
 
-    // Record redemption
     await supabase.from('redemptions').insert({
       customer_id,
       card_id:         customer.card_id,
@@ -223,7 +223,6 @@ router.post('/redeem', authMiddleware, async (req, res) => {
       redeem_type:     'stamp'
     })
 
-    // Push: confirm redemption
     await pushService.sendToCustomer(
       customer,
       `Your "${rewardDesc}" reward has been redeemed! Collect ${goal} more stamps to earn the next one. See you next time!`,
@@ -241,8 +240,7 @@ router.post('/redeem', authMiddleware, async (req, res) => {
   }
 })
 
-// ─── POST /api/scan/redeem-points ───────────────────────────
-// 멤버십 포인트 차감 (staff가 points 금액 입력 후 redeem)
+// POST /api/scan/redeem-points — membership points deduction
 router.post('/redeem-points', authMiddleware, async (req, res) => {
   try {
     const { customer_id, points, reward_label } = req.body
@@ -264,7 +262,6 @@ router.post('/redeem-points', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Points redemption is only available for membership cards' })
     }
 
-    // Calculate total available points (stamps × 100 − already redeemed)
     const [{ count: totalStamps }, { data: prevRedemptions }] = await Promise.all([
       supabase.from('stamps').select('id', { count: 'exact' }).eq('customer_id', customer_id),
       supabase.from('redemptions').select('points_redeemed').eq('customer_id', customer_id).eq('redeem_type', 'points')
@@ -275,12 +272,9 @@ router.post('/redeem-points', authMiddleware, async (req, res) => {
     const pointsBalance = totalEarned - totalSpent
 
     if (points > pointsBalance) {
-      return res.status(400).json({
-        error: `Not enough points. Balance: ${pointsBalance} pts, requested: ${points} pts.`
-      })
+      return res.status(400).json({ error: `Not enough points. Balance: ${pointsBalance} pts, requested: ${points} pts.` })
     }
 
-    // Record redemption
     await supabase.from('redemptions').insert({
       customer_id,
       card_id:          customer.card_id,
@@ -291,7 +285,6 @@ router.post('/redeem-points', authMiddleware, async (req, res) => {
 
     const newBalance = pointsBalance - points
 
-    // Push notification
     await pushService.sendToCustomer(
       customer,
       `${points} points redeemed! Remaining balance: ${newBalance} pts.`,
