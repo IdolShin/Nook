@@ -264,49 +264,36 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 
 ## In Progress 🔄
 
-- **Google Wallet publishing approval** — submitted, waiting 1-3 days
-  → Once approved: real customers can add passes to Google Wallet (currently demo mode only)
-- **Supabase migration done** ✅ — `birthday DATE` column added + `redemptions` table columns added (2026-05-25)
-- **⚠️ Supabase migration for Session 32** — `supabase_migration_session32.sql` must be run (adds stamps_redeemed, points_redeemed, redeem_type to redemptions table)
+없음 — 모든 핵심 기능 완료 ✅
+
+---
+
+## System Status (2026-05-30 기준)
+
+| 항목 | 상태 |
+|------|------|
+| Google Wallet | ✅ **Active** (승인 완료, 실제 고객 사용 가능) |
+| Supabase 마이그레이션 session32 | ✅ 실행 완료 |
+| Supabase 마이그레이션 session34 | ✅ 실행 완료 |
+| Resend API Key | ✅ Railway 환경변수 설정 완료 |
+| Railway 배포 (백엔드/프론트) | ✅ 자동 배포 완료 |
+| 스캐너 카메라 | ✅ BarcodeDetector API 구현 완료 |
+| 쿠폰 Wallet 상태 동기화 | ✅ COMPLETED/EXPIRED 모두 구현 완료 |
+| Toast 시스템 | ✅ 전체 대시보드 적용 완료 |
 
 ---
 
 ## Todo List
 
-### 🔴 Urgent
-- [ ] **Run `supabase_migration_session34.sql`** — adds user_id, unique_key, birthday_mmdd + relaxes name/phone NOT NULL
-- [ ] **`git push origin main`** (backend: commit `b1260bb`, frontend: commit `3b4710a`) — Railway auto-deploy
-- [ ] **Run `supabase_migration_session32.sql`** — (if not yet done) adds stamps_redeemed/points_redeemed/redeem_type
-- [ ] **Resend API key** — add to Railway backend env vars
-- [ ] **Coupon → Google Wallet** — real connection test end-to-end
-- [x] **Edit Card form** ✅ Done (Session 6)
-- [x] **Register page backend** ✅ Done (Session 6)
-- [x] **Scanner coupon redeem** ✅ Done (Session 6)
-- [x] **Domain purchase** ✅ Done (Session 21)
-- [x] **Homepage** ✅ Done (Session 7) — mobile responsive fix: `word-break: keep-all` on all Korean text, `overflow-x: hidden` at 980px, hero grid 55fr/45fr, h1 clamp
-- [x] **Dashboard charts** ✅ Done (Session 7) — wired to real API: KPI stats, line chart (30d stamps/redeems), donut (card type mix), activity feed (recent signups)
-- [x] **New Card registration bug** ✅ Done (Session 8) — fixed 502 caused by truncated analytics.js on GitHub
-- [x] **Customers page — Export CSV** ✅ Done (Session 8) — Blob download with Name/Phone/Status/Stamps/Joined/LastVisit
-- [x] **Customers page — Send coupon** ✅ Done (Session 8) — CouponPickerModal per-customer coupon dispatch
-- [x] **api.ts registerCustomer** ✅ Done (Session 11) — `registerCustomer()` added to api.ts, calls `POST /api/customers/register`
-- [x] **Register page API** ✅ Done (Session 11) — name field added, `handleRegister` wired to real backend, card_id from URL param
+### 🟡 중간 우선순위
+- [ ] **Stripe 연동** — 구독 결제 시스템. 현재 플랜 제한은 있지만 실제 과금 없음. Stripe Checkout + webhook으로 plan 컬럼 자동 업데이트 필요
+- [ ] **Google Wallet pass 리딤 후 COMPLETED 표시** — 스탬프 카드 fully redeemed 시 wallet pass 상태 업데이트 (쿠폰은 이미 됨)
 
-### 🟡 Medium Priority
-- [x] **Customer registration page** — ✅ Done (Session 11) — connected to real backend (`POST /api/customers/register`), name + phone fields, card_id from URL `?card_id=` param
-- [ ] **Scanner app** — real camera QR/barcode scanning (jsQR library)
-- [ ] **Google Wallet pass status** — COMPLETED on redeem, EXPIRED on expiry
-      (so customer sees updated state in their wallet)
-- [x] **Analytics page** — ~~wire to real DB data~~ ✅ Done (Session 5)
-- [ ] **Dashboard forms** — loading states, error messages, success toasts
-- [ ] **Google Wallet publishing** — complete 3-step process in Pay Console
-
-### 🟢 Later / Nice to Have
-- [ ] **Apple Wallet** — $99/yr Apple Developer account needed
-- [ ] **Stripe integration** — subscription billing per plan
-- [x] **Google Review coupon** ✅ Done (Session 19) — customer leaves review → `days_to_wait` 후 자동 스탬프/쿠폰 지급, `review_rewards` 테이블, 매일 9am 스케줄러 처리
-- [ ] **SMS notifications** — Twilio or similar
-- [ ] **Multi-location business support**
-- [ ] **White-label option** for Premium plan
+### 🟢 나중에 / 있으면 좋은 것
+- [ ] **Apple Wallet** — Apple Developer 계정 ($99/yr) 먼저 필요
+- [ ] **SMS 알림** — Twilio 연동. 푸시 동의 안 한 고객에게 문자 발송
+- [ ] **멀티 로케이션** — 한 비즈니스 여러 지점 지원
+- [ ] **White-label** — Premium 플랜용 커스텀 도메인/브랜딩
 
 ---
 
@@ -1044,4 +1031,33 @@ git push origin main
   - **Root cause**: CM6 injection for this file appended to the file instead of replacing it, resulting in TWO complete `export default function RootLayout` definitions concatenated:
     1. First (wrong): `Plus_Jakarta_Sans` font + encoding corruption in title (`"Nook â Loyalty Platform"`)
     2. Second (correct): `Inter` font + same encoding corruption
-  - **Symptoms**: Duplicate `<meta charset>` + `<meta viewport>` tags in HTML, three font cla
+  - **Symptoms**: Duplicate `<meta charset>` + `<meta viewport>` tags in HTML, three font class variables on `<html>` element (including unexpected `sora_f0ca33ab`), all CSS files reporting 0 parsed rules via CSSOM, homepage completely unstyled
+  - **Fix**: Replaced entire file via `execCommand('selectAll')` + `execCommand('insertText')` with clean 65-line single-definition version using `Inter` + `JetBrains_Mono` fonts, no encoding corruption
+  - Commit `5c64877`: `fix: layout.tsx - remove duplicate RootLayout, restore single Inter-font definition`
+
+**Verified post-fix:**
+- Homepage: dark green hero, stamp card mockup, stat cards (94%/+38%/10분), "왜 손님들은 다시 올까요?" section — all styled ✅
+- Admin dashboard: KPI cards, line chart, donut chart, recent signups feed — all working ✅
+- Railway auto-deploy triggered from `main` branch push ✅
+
+---
+
+### 2026-05-09 (Session 15 — Fix Truncated Files + Railway Build Recovery)
+
+**Root cause:** Session 14's CM6 injection commits silently truncated three files, causing Railway builds to fail with "Parsing ecmascript source code failed". The last successful Railway build was the "feat: integrate SplashScreen into layout with Sora font" commit (all subsequent builds failed). Also `layout.tsx` had a `bottomNavH` used-before-declaration TypeScript error introduced by the Session 14 scroll-lock fix.
+
+**Frontend (IdolShin/nook-admin) — 4 files fixed:**
+
+- **`src/lib/api.ts`** — Restored ApiCoupon + ApiCouponPass interfaces (commit `fix: api.ts - restore complete ApiCoupon + ApiCouponPass interfaces`)
+  - File was truncated at line 305: `ApiCoupon { id: string;` (just spaces after)
+  - Fix: spliced correct tail content after the `id: string;` line via CM6 dispatch
+  - GitHub confirmed: 334 lines, 11641 bytes
+
+- **`src/components/SplashScreen.tsx`** — Restored closing JSX (commit `fix: SplashScreen.tsx - restore complete closing JSX (was truncated)`)
+  - File truncated at line 576 (just spaces), missing: `</div>` (nk-markwrap), nk-word/nk-lockup wordmark div, `</div>` (nk-stage), `</div>` (nk-splash), `</>`, `);`, `}`, `export default SplashScreen;`
+  - Fix: fetched original commit `22ef043` via GitHub API, found the nk-r2 span as common anchor point, spliced original's tail onto current head
+  - GitHub confirmed: 599 lines
+
+- **`src/app/(admin)/register/page.tsx`** — Restored complete 391-line version (commit `fix: register/page.tsx - restore complete 391-line version with Suspense + API`)
+  - File truncated to 179 lines on GitHub (severely broken mid-JSX)
+  - Fix: fetched Session 12 commit `9b2f4c3` (Suspense boundary version — complete, has registerCustomer + handleRegister + Suspense wr
