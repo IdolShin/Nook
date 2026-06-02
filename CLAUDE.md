@@ -383,6 +383,26 @@ git push origin main
 
 ## Change Log
 
+### 2026-05-31 (Session 36 — 스캐너/스캔 카메라 iOS 수정 + 수동 입력 + 백엔드 매칭 개선)
+
+**문제:** 사장님이 실제로 쓰는 화면은 하단 "Scan" 버튼으로 들어가는 `/scan` (staff) 페이지였는데, 그동안 수정한 것은 `/scanner` (admin) 페이지였음. `/scan`은 (1) 한국어였고 (2) iOS Safari에서 작동 안 하는 옛날 카메라 방식(jsQR + 외부 스크립트, `display:none` 비디오)이었음.
+
+**백엔드 (IdolShin/Nook) — `src/routes/scan.js`:**
+
+- **`e1b89cc`** — 고객 매칭 확장: `code`를 `qr_code` OR `barcode` OR `unique_key` 어느 것으로든 조회 (이전엔 한 필드만)
+- **`5a504b6`** — 수동 입력 숫자만 받기: 비즈니스 `unique_key` prefix(예: `NOO`) 자동 prepend → 사장님은 뒤 숫자(`12345`)만 입력하면 `NOO12345`로 완성되어 매칭
+
+**프론트엔드 (IdolShin/nook-admin) — 4개 커밋:**
+
+- **`fb00cfa`** — `/scanner` 페이지: 영숫자 수동 입력 + 카메라 fallback/retry 버튼 추가 (`src/lib/api.ts` 시그니처 보정)
+- **`a38467c`** — `/scanner` 페이지: jsQR → **ZXing**(아이폰 호환) 카메라 교체, prefix 고정 숫자 입력. `package.json`에 ZXing 의존성 추가, `usePlan.ts` 보정
+- **`7d609dc`** — `/scanner` 페이지: 비디오 `display:none` 제거(iOS Safari가 숨긴 비디오의 카메라를 못 켜는 버그) → `opacity`로만 처리
+- **`2915fd4`** — **`/scan` (staff) 페이지 완전 재작성** (543줄 삭제, 227줄): 사장님이 실제 쓰는 화면. ZXing 카메라(비디오 항상 표시, 후면→전면 폴백, Retry camera 버튼), 전체 쉬운 영어 + lucide 아이콘(Camera/Check/X/Hash/RotateCw), prefix 고정 숫자 입력(`[ NOO ][ 12345 ]`)
+
+**Verified:** 양쪽 Railway 자동 배포 ✅ (사장님 실사용 화면 = `/scan` 확정, ZXing + 영어 UI로 전환 완료)
+
+---
+
 ### 2026-05-30 (Session 35 — Stamp 리딤 리셋 사이클 + Reward Tiers 멀티옵션)
 
 **백엔드 (IdolShin/Nook) — 2개 파일 변경 + 신규 SQL:**
