@@ -17,8 +17,8 @@ function buildToken(biz) {
       is_superadmin: biz.is_superadmin || SUPERADMIN_EMAILS.includes(biz.owner_email) || false,
       page_permissions: biz.page_permissions || null,  // null = full access
     },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
+    process.env.JWT_SECRET
+    // no expiresIn - owner sessions never expire (logout only)
   )
 }
 
@@ -188,8 +188,8 @@ router.patch('/me', require('../middleware/auth').authMiddleware, async (req, re
 router.post('/scanner-token', require('../middleware/auth').authMiddleware, async (req, res) => {
   const token = jwt.sign(
     { id: req.business.id, name: req.business.name, role: 'scanner' },
-    process.env.JWT_SECRET,
-    { expiresIn: '30d' }
+    process.env.JWT_SECRET
+    // no expiresIn - scanner tokens never expire
   )
   res.json({ scanner_token: token })
 })

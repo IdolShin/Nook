@@ -77,7 +77,18 @@ router.post('/', authMiddleware, async (req, res) => {
 
     const newCurrent = isMembership ? null : (newTotal % goal)
     const isReward   = isMembership ? false : (newCurrent === 0)
-    const totalPoints = isMembership ? newTotal * 100 : null
+
+    // Membership: wallet/UI shows BALANCE (earned - already redeemed)
+    let totalPoints = null
+    if (isMembership) {
+      const { data: prevRed } = await supabase
+        .from('redemptions')
+        .select('points_redeemed')
+        .eq('customer_id', customer.id)
+        .eq('redeem_type', 'points')
+      const spent = (prevRed || []).reduce((s, r) => s + (r.points_redeemed || 0), 0)
+      totalPoints = newTotal * 100 - spent
+    }
 
     // 5. If reward (stamp cards only) — auto-issue stamp_complete coupons
     let rewardReady = false
@@ -181,7 +192,7 @@ router.post('/redeem', authMiddleware, async (req, res) => {
 
     const { data: customer, error: findErr } = await supabase
       .from('customers')
-      .select('id, name, device_token, card_id, loyalty_cards(goal_stamps, reward_desc)')
+      .select('id, name, device_token, wallet_type, card_id, loyalty_cards(goal_stamps, reward_desc)')
       .eq('id', customer_id)
       .eq('business_id', req.business.id)
       .single()
@@ -223,6 +234,13 @@ router.post('/redeem', authMiddleware, async (req, res) => {
       redeem_type:     'stamp'
     })
 
+    // Sync Google Wallet - reset pass to 0/goal right away (fire-and-forget)
+    if (customer.wallet_type === 'google') {
+      updateStamps(customer_id, 0).catch(err =>
+        console.error('[Google Wallet] redeem reset sync failed:', err.message)
+      )
+    }
+
     await pushService.sendToCustomer(
       customer,
       `Your "${rewardDesc}" reward has been redeemed! Collect ${goal} more stamps to earn the next one. See you next time!`,
@@ -250,7 +268,7 @@ router.post('/redeem-points', authMiddleware, async (req, res) => {
 
     const { data: customer, error: findErr } = await supabase
       .from('customers')
-      .select('id, name, device_token, card_id, loyalty_cards(card_type, reward_desc)')
+      .select('id, name, device_token, wallet_type, card_id, loyalty_cards(card_type, reward_desc)')
       .eq('id', customer_id)
       .eq('business_id', req.business.id)
       .single()
@@ -284,6 +302,13 @@ router.post('/redeem-points', authMiddleware, async (req, res) => {
     })
 
     const newBalance = pointsBalance - points
+
+    // Sync Google Wallet - show remaining balance (fire-and-forget)
+    if (customer.wallet_type === 'google') {
+      updateMembershipPoints(customer_id, newBalance).catch(err =>
+        console.error('[Google Wallet] points balance sync failed:', err.message)
+      )
+    }
 
     await pushService.sendToCustomer(
       customer,

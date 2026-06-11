@@ -221,8 +221,8 @@ router.post('/staff-login', async (req, res) => {
         staff_role: user.role,
         page_permissions: user.page_permissions,
       },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
+      process.env.JWT_SECRET
+      // no expiresIn - staff sessions never expire (logout only)
     )
 
     res.json({ token, business: biz, staff: { id: user.id, name: user.name, role: user.role } })
