@@ -279,7 +279,7 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 | Google Wallet | ✅ **Active** (승인 완료, 실제 고객 사용 가능) |
 | Supabase 마이그레이션 session32 | ✅ 실행 완료 |
 | Supabase 마이그레이션 session34 | ✅ 실행 완료 |
-| Supabase 마이그레이션 session35 | ⚠️ **미실행** — reward_tiers + reward_label 컬럼 추가 필요 |
+| Supabase 마이그레이션 session35 | ✅ 실행 완료 (2026-06-11, Session 37) |
 | Resend API Key | ✅ Railway 환경변수 설정 완료 |
 | Railway 배포 (백엔드/프론트) | ✅ 자동 배포 완료 |
 | 스캐너 카메라 | ✅ BarcodeDetector API 구현 완료 |
@@ -382,6 +382,44 @@ git push origin main
 ---
 
 ## Change Log
+
+### 2026-06-10~11 (Session 37 — Google Wallet 가입 연동 + 대시보드 복구 + 전체 기능 점검 + 샘플 데이터)
+
+**핵심 버그 1 — 가입해도 Google Wallet 추가 불가:**
+- 원인: `/api/customers/register`(공개)가 월렛 패스를 생성하지 않았음. 월렛 생성은 사장님 JWT 전용 `/api/wallet/google/create`에만 존재 → 고객 가입 플로우와 단절
+- 수정: register에서 `createLoyaltyClass` + `createLoyaltyObject` + `generateWalletLink` 호출, 응답에 `wallet_link` 포함 (실패해도 가입은 성공하는 non-fatal 처리) — backend `2fe2812`
+- `/join/[slug]` 성공 화면 전면 교체: QR/고유번호 제거 → "가입이 완료되었습니다!" + 검은색 "구글 월렛에 추가하기" 버튼 — frontend `fd10f09`
+
+**핵심 버그 2 — 대시보드에 고객 안 보임:**
+- 원인: JWT 만료(6/1) 후에도 로그아웃 처리가 없어 모든 API가 401 → 페이지는 mock/빈 데이터 표시
+- 수정: `api.ts` req()에서 401 시 토큰 삭제 + `/auth` 리다이렉트; 세션 쿠키 30일; 백엔드 JWT `expiresIn` fallback '30d' — frontend `35a98bb`, backend `d72ee6d`/`b301c6e`
+
+**핵심 버그 3 — redemptions 조회 500:**
+- 원인: redemptions 테이블 컬럼은 `redeemed_at`인데 코드가 `created_at` 조회
+- 수정: `customers.js` `/:id/redemptions` + `analytics.js` 리딤 쿼리를 `redeemed_at`으로 교체 (응답에는 `created_at` alias 유지)
+
+**DB 마이그레이션 (Supabase SQL Editor에서 실행 완료):**
+- session35 (`reward_tiers` JSONB, `redemptions.reward_label`) + session32 컬럼 멱등 재확인
+
+**월렛 패스 디자인 + 가입화면 개선:**
+- 패스 로고 fallback: Google G → Nook 로고 (`nook-wallet.com/wallet-logo.png`), 히어로 이미지 추가 (`wallet-hero.png`), QR 밑 표시를 8자리 숫자 → `unique_key`(NOO12345) — backend `030c289`, frontend `25c2823`
+- `/join/[slug]`: 영어 기본(localStorage 키 `nook-join-lang` 분리), 눈에 띄는 EN/한국어 알약 토글 — `e45e8f8`
+- 마케팅 동의 필수화: 체크 전 가입 버튼 비활성 + "(필수)" 라벨 — `9dcb4bc`
+- 대시보드 Quick stats Plan: 하드코딩 'Starter' → JWT의 실제 plan — `5962e42`
+
+**전체 기능 스모크 테스트 (라이브, 전부 통과):**
+stats/analytics/cards/card-stats/customers/lookup/scan/wallet-stamp/redemptions/push(ET 시간외 예약 동작)/coupons CRUD/coupon issue/공개 pass 페이지/coupon redeem/reviews config/permissions users/profile PATCH/scanner-token
+
+**샘플 데이터 (Nook Cafe):**
+- 고객 50명 생성(실제 register API → 월렛 패스 포함), 스탬프 213개, 리딤 3건, 쿠폰 5장 발급+1장 리딤
+- created_at/스탬프/리딤 시각을 지난 30일에 랜덤 분산 (Salgoo 제외) — 대시보드 차트 정상 표시
+
+**⚠️ 교훈 (sandbox 마운트 신뢰 불가):**
+- Linux sandbox 마운트가 파일을 중간에 잘린 상태(stale)로 보여줄 수 있음 → working tree에서 `git add`/`hash-object` 금지
+- 안전한 커밋 절차: GitHub raw에서 원본 fetch → python으로 수정 → `/tmp`에 작성 → `GIT_INDEX_FILE=/tmp/idx` + `hash-object`/`update-index`/`write-tree`/`commit-tree`/`update-ref` → Windows bat(`push_session37.bat`)로 push
+- 이 문제로 analytics/auth/permissions가 잘린 채 배포되어 백엔드 크래시 발생 → `b301c6e`로 복구
+
+---
 
 ### 2026-05-31 (Session 36 — 스캐너/스캔 카메라 iOS 수정 + 수동 입력 + 백엔드 매칭 개선)
 
