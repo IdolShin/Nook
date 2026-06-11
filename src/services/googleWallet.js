@@ -27,6 +27,10 @@ function objectId(customerId) {
   return `${ISSUER_ID}.customer_${customerId.replace(/-/g, '_')}`
 }
 
+// Nook brand assets (hosted on nook-wallet.com - see nook-admin/public/)
+const NOOK_LOGO_URL = 'https://nook-wallet.com/wallet-logo.png'
+const NOOK_HERO_URL = 'https://nook-wallet.com/wallet-hero.png'
+
 function buildClass(card, business) {
   const isMembership = card.card_type === 'membership'
   return {
@@ -35,10 +39,13 @@ function buildClass(card, business) {
     programName: card.name,
     programLogo: {
       sourceUri: {
-        uri: business.logo_url ||
-          'https://www.gstatic.com/images/branding/product/2x/googleg_48dp.png'
+        uri: business.logo_url || NOOK_LOGO_URL
       },
       contentDescription: { defaultValue: { language: 'en-US', value: business.name } }
+    },
+    heroImage: {
+      sourceUri: { uri: NOOK_HERO_URL },
+      contentDescription: { defaultValue: { language: 'en-US', value: 'Nook Wallet' } }
     },
     rewardsTierLabel: isMembership ? 'Points' : 'Stamps',
     rewardsTier: isMembership
@@ -60,7 +67,7 @@ function buildClass(card, business) {
 
 function buildObject(customer, card, currentStamps) {
   const isMembership = card.card_type === 'membership'
-  // For membership: currentStamps is visit count, display value = visits × 100
+  // For membership: currentStamps is visit count, display value = visits x 100
   const displayPoints = isMembership ? (currentStamps * 100) : currentStamps
 
   const obj = {
@@ -76,7 +83,8 @@ function buildObject(customer, card, currentStamps) {
     barcode: {
       type: 'QR_CODE',
       value: customer.qr_code,
-      alternateText: customer.barcode
+      // Show the member unique key (e.g. NOO12345) under the QR code
+      alternateText: customer.unique_key || customer.barcode
     },
     textModulesData: [
       {
@@ -100,8 +108,8 @@ function buildObject(customer, card, currentStamps) {
   return obj
 }
 
-// ─── createLoyaltyClass ──────────────────────────────────────
-// 카드 템플릿 생성 (loyalty_cards 1개당 1번)
+// --- createLoyaltyClass ---
+// Card template upsert (1 per loyalty_cards row)
 async function createLoyaltyClass(card, business) {
   const auth = getAuth()
   const client = google.walletobjects({ version: 'v1', auth })
@@ -109,7 +117,7 @@ async function createLoyaltyClass(card, business) {
 
   try {
     const { data } = await client.loyaltyclass.get({ resourceId: body.id })
-    // 이미 존재하면 update
+    // exists -> update
     const { data: updated } = await client.loyaltyclass.update({
       resourceId: body.id,
       requestBody: { ...data, ...body }
@@ -117,14 +125,14 @@ async function createLoyaltyClass(card, business) {
     return updated
   } catch (err) {
     if (err.code !== 404) throw err
-    // 없으면 신규 생성
+    // missing -> insert
     const { data } = await client.loyaltyclass.insert({ requestBody: body })
     return data
   }
 }
 
-// ─── createLoyaltyObject ─────────────────────────────────────
-// 고객별 카드 발급 (customers 1명당 1번)
+// --- createLoyaltyObject ---
+// Per-customer pass upsert (1 per customer)
 async function createLoyaltyObject(customer, card, currentStamps = 0) {
   const auth = getAuth()
   const client = google.walletobjects({ version: 'v1', auth })
@@ -132,7 +140,7 @@ async function createLoyaltyObject(customer, card, currentStamps = 0) {
 
   try {
     await client.loyaltyobject.get({ resourceId: body.id })
-    // 이미 존재하면 update
+    // exists -> update
     const { data } = await client.loyaltyobject.update({
       resourceId: body.id,
       requestBody: body
@@ -145,9 +153,8 @@ async function createLoyaltyObject(customer, card, currentStamps = 0) {
   }
 }
 
-// ─── generateWalletLink ──────────────────────────────────────
-// "Google Wallet에 추가" 버튼 링크 생성
-// 사전에 createLoyaltyClass + createLoyaltyObject 호출 필요
+// --- generateWalletLink ---
+// "Add to Google Wallet" link (requires class+object created first)
 function generateWalletLink(customerId) {
   const credentials = loadCredentials()
 
@@ -165,8 +172,8 @@ function generateWalletLink(customerId) {
   return `https://pay.google.com/gp/v/save/${token}`
 }
 
-// ─── updateStamps ────────────────────────────────────────────
-// 스탬프 찍힐 때마다 호출 — 카드 숫자 업데이트
+// --- updateStamps ---
+// Called after each stamp scan - updates the pass number
 async function updateStamps(customerId, currentStamps) {
   const auth = getAuth()
   const client = google.walletobjects({ version: 'v1', auth })
@@ -193,8 +200,8 @@ async function updateStamps(customerId, currentStamps) {
   return data
 }
 
-// ─── updateMembershipPoints ──────────────────────────────────
-// 멤버십 카드 포인트 업데이트 (스캔 1회 = +100pts, 누적)
+// --- updateMembershipPoints ---
+// Membership card points update (1 scan = +100pts, cumulative)
 async function updateMembershipPoints(customerId, totalPoints) {
   const auth = getAuth()
   const client = google.walletobjects({ version: 'v1', auth })
@@ -213,7 +220,7 @@ async function updateMembershipPoints(customerId, totalPoints) {
     label: 'Points',
     balance: { int: totalPoints }
   }
-  // Membership has no goal — remove secondaryLoyaltyPoints if present
+  // Membership has no goal - remove secondaryLoyaltyPoints if present
   delete existing.secondaryLoyaltyPoints
 
   const { data } = await client.loyaltyobject.update({
@@ -223,8 +230,8 @@ async function updateMembershipPoints(customerId, totalPoints) {
   return data
 }
 
-// ─── updateWithMessage ───────────────────────────────────────
-// Patches a loyalty object with a message — triggers lock screen notification
+// --- updateWithMessage ---
+// Patches a loyalty object with a message - triggers lock screen notification
 async function updateWithMessage(customerId, messageHeader, messageBody) {
   const auth = getAuth()
   const client = google.walletobjects({ version: 'v1', auth })
@@ -250,7 +257,7 @@ async function updateWithMessage(customerId, messageHeader, messageBody) {
   return { updated: true }
 }
 
-// ─── Coupon pass helpers ──────────────────────────────────────
+// --- Coupon pass helpers ---
 function couponClassId(couponId) {
   return `${ISSUER_ID}.coupon_${couponId.replace(/-/g, '_')}`
 }
