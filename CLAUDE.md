@@ -280,7 +280,7 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 | 월렛 패스 디자인 | ✅ Nook 로고 fallback + 히어로 이미지 + QR 밑 unique_key(NOO12345) 표시 |
 | 고객 가입 (/join/[slug]) | ✅ 영어 기본 + EN/한국어 토글, 마케팅 동의 필수, 월렛 버튼 |
 | Supabase 마이그레이션 (32/34/35) | ✅ 전부 실행 완료 |
-| 인증/세션 | ✅ 401 자동 로그아웃 → /auth 리다이렉트, 세션 쿠키 30일 |
+| 인증/세션 | ✅ JWT 만료 없음(로그아웃 전까지 유지), 401 시 자동 /auth 리다이렉트, 쿠키 1년 |
 | 대시보드/고객/애널리틱스 | ✅ 실데이터 정상 표시 (redemptions `redeemed_at` 버그 수정) |
 | 쿠폰 시스템 | ✅ 생성/발급/공개 패스 페이지/바코드 리딤 라이브 검증 |
 | 푸시 알림 | ✅ ET 8am-8pm 발송, 시간 외 자동 예약 검증 |
@@ -295,8 +295,6 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 ### 🔴 다음 작업 (단기)
 - [ ] **대시보드 "Scheduled pushes" 실데이터 연동** — 현재 mock(data.ts) 고정 표시. 실제 예약 푸시 목록 API + UI 연결 필요
 - [ ] **Auto Campaigns 실전 검증** — 생일/윈백/스탬프완성 자동 쿠폰 스케줄러(매일 9am)는 구현돼 있으나 실제 발송 한 번도 미확인
-- [ ] **Railway env `JWT_EXPIRES_IN` 7d → 30d 변경(또는 삭제)** — 코드 fallback은 30d지만 env 7d가 우선 적용 중 (사장님 일주일마다 재로그인)
-- [ ] **Google Wallet 스탬프카드 리딤 후 COMPLETED 표시** — fully redeemed 시 패스 상태 업데이트 (쿠폰 패스는 이미 구현됨)
 
 ### 🟡 중간 우선순위
 - [ ] **Stripe 연동** — 구독 결제. 플랜 제한은 동작하나 실제 과금 없음. Stripe Checkout + webhook으로 plan 컬럼 자동 업데이트
@@ -310,7 +308,7 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 - [ ] **구버전 월렛 패스 표기 정리** — unique_key 도입 전 가입 고객의 패스는 QR 밑이 8자리 숫자 (다음 스탬프 동기화 때 자동 갱신되지는 않음 — 재발급 필요)
 
 ### ✅ 완료되어 목록에서 제거된 항목 (Session 37)
-~~Coupon Wallet Flow~~ · ~~Push Notification Targeting~~ · ~~가입→월렛 연동~~ · ~~session35 마이그레이션~~ — 전부 구현 + 라이브 검증 완료
+~~Coupon Wallet Flow~~ · ~~Push Notification Targeting~~ · ~~가입→월렛 연동~~ · ~~session35 마이그레이션~~ · ~~세션 만료 제거 (JWT exp 없음, 재로그인 불필요)~~ · ~~리딤 시 월렛 패스 즉시 동기화 (스탬프 0 리셋 / 멤버십 잔액 표시)~~ · ~~월렛 잠금화면 알림 TEXT_AND_NOTIFY~~ — 전부 구현 + 라이브 검증 완료
 
 ---
 
