@@ -145,4 +145,4 @@ router.get('/', async (req, res) => {
   }
 })
 
-module.exports = rou
+module.exports = router

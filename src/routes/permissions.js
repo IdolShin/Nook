@@ -232,4 +232,4 @@ router.post('/staff-login', async (req, res) => {
   }
 })
 
-module.exports 
+module.exports = router

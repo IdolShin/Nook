@@ -194,4 +194,4 @@ router.post('/scanner-token', require('../middleware/auth').authMiddleware, asyn
   res.json({ scanner_token: token })
 })
 
-module.exports 
+module.exports = router
