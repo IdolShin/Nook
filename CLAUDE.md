@@ -268,59 +268,49 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 
 ## In Progress 🔄
 
-없음 — 모든 핵심 기능 완료 ✅
+없음 — 핵심 기능 모두 구현 + 전체 라이브 검증 완료 ✅ (Session 37)
 
 ---
 
-## System Status (2026-05-31 기준)
+## System Status (2026-06-11 기준)
 
 | 항목 | 상태 |
 |------|------|
-| Google Wallet | ✅ **Active** (승인 완료, 실제 고객 사용 가능) |
-| Supabase 마이그레이션 session32 | ✅ 실행 완료 |
-| Supabase 마이그레이션 session34 | ✅ 실행 완료 |
-| Supabase 마이그레이션 session35 | ✅ 실행 완료 (2026-06-11, Session 37) |
-| Resend API Key | ✅ Railway 환경변수 설정 완료 |
-| Railway 배포 (백엔드/프론트) | ✅ 자동 배포 완료 |
-| 스캐너 카메라 | ✅ BarcodeDetector API 구현 완료 |
-| 쿠폰 Wallet 상태 동기화 | ✅ COMPLETED/EXPIRED 모두 구현 완료 |
-| Toast 시스템 | ✅ 전체 대시보드 적용 완료 |
+| Google Wallet | ✅ **Active** — 가입 즉시 패스 발급 + "구글 월렛에 추가하기" 버튼 연동 |
+| 월렛 패스 디자인 | ✅ Nook 로고 fallback + 히어로 이미지 + QR 밑 unique_key(NOO12345) 표시 |
+| 고객 가입 (/join/[slug]) | ✅ 영어 기본 + EN/한국어 토글, 마케팅 동의 필수, 월렛 버튼 |
+| Supabase 마이그레이션 (32/34/35) | ✅ 전부 실행 완료 |
+| 인증/세션 | ✅ 401 자동 로그아웃 → /auth 리다이렉트, 세션 쿠키 30일 |
+| 대시보드/고객/애널리틱스 | ✅ 실데이터 정상 표시 (redemptions `redeemed_at` 버그 수정) |
+| 쿠폰 시스템 | ✅ 생성/발급/공개 패스 페이지/바코드 리딤 라이브 검증 |
+| 푸시 알림 | ✅ ET 8am-8pm 발송, 시간 외 자동 예약 검증 |
+| 스캐너 카메라 | ✅ ZXing (iOS Safari 호환) |
+| Resend / Railway 배포 | ✅ 정상 |
+| Nook Cafe 테스트 데이터 | ✅ 고객 64명, 스탬프 245개, 리딤 3건, 쿠폰 5장 (30일 분산) |
 
 ---
 
 ## Todo List
 
+### 🔴 다음 작업 (단기)
+- [ ] **대시보드 "Scheduled pushes" 실데이터 연동** — 현재 mock(data.ts) 고정 표시. 실제 예약 푸시 목록 API + UI 연결 필요
+- [ ] **Auto Campaigns 실전 검증** — 생일/윈백/스탬프완성 자동 쿠폰 스케줄러(매일 9am)는 구현돼 있으나 실제 발송 한 번도 미확인
+- [ ] **Railway env `JWT_EXPIRES_IN` 7d → 30d 변경(또는 삭제)** — 코드 fallback은 30d지만 env 7d가 우선 적용 중 (사장님 일주일마다 재로그인)
+- [ ] **Google Wallet 스탬프카드 리딤 후 COMPLETED 표시** — fully redeemed 시 패스 상태 업데이트 (쿠폰 패스는 이미 구현됨)
+
 ### 🟡 중간 우선순위
-- [ ] **Stripe 연동** — 구독 결제 시스템. 현재 플랜 제한은 있지만 실제 과금 없음. Stripe Checkout + webhook으로 plan 컬럼 자동 업데이트 필요
-- [ ] **Google Wallet pass 리딤 후 COMPLETED 표시** — 스탬프 카드 fully redeemed 시 wallet pass 상태 업데이트 (쿠폰은 이미 됨)
+- [ ] **Stripe 연동** — 구독 결제. 플랜 제한은 동작하나 실제 과금 없음. Stripe Checkout + webhook으로 plan 컬럼 자동 업데이트
+- [ ] **가입 페이지 Apple Wallet 배지 정리** — Apple Wallet 미지원인데 배지 노출 중 → 숨기거나 "Coming soon" 처리
 
 ### 🟢 나중에 / 있으면 좋은 것
-- [ ] **Apple Wallet** — Apple Developer 계정 ($99/yr) 먼저 필요
-- [ ] **SMS 알림** — Twilio 연동. 푸시 동의 안 한 고객에게 문자 발송
+- [ ] **Apple Wallet 지원** — Apple Developer 계정($99/yr) 필요
+- [ ] **SMS 알림** — Twilio 연동, 푸시 미동의 고객에게 문자
 - [ ] **멀티 로케이션** — 한 비즈니스 여러 지점 지원
 - [ ] **White-label** — Premium 플랜용 커스텀 도메인/브랜딩
+- [ ] **구버전 월렛 패스 표기 정리** — unique_key 도입 전 가입 고객의 패스는 QR 밑이 8자리 숫자 (다음 스탬프 동기화 때 자동 갱신되지는 않음 — 재발급 필요)
 
----
-
-## Wanted Features
-
-### 1. Coupon Wallet Flow (priority)
-1. Owner sends coupon (e.g. "Free garlic bread") to loyal customers
-2. Coupon added to customer Google Wallet (barcode + expiry date)
-3. Customer visits, shows barcode to staff
-4. Staff scans barcode in scanner app → marked REDEEMED
-5. Google Wallet pass updates to COMPLETED status
-6. Customer can delete used/expired passes (Google Wallet handles natively)
-
-### 2. Push Notification Targeting
-- Send to all customers of a specific business
-- Send to individual customers
-- Already built, needs UI verification
-
-### 3. Auto Campaigns (built, needs testing)
-- Birthday coupons (auto-send on birth month)
-- Winback coupons (auto-send after 30 days no visit)
-- Stamp-complete bonus coupon
+### ✅ 완료되어 목록에서 제거된 항목 (Session 37)
+~~Coupon Wallet Flow~~ · ~~Push Notification Targeting~~ · ~~가입→월렛 연동~~ · ~~session35 마이그레이션~~ — 전부 구현 + 라이브 검증 완료
 
 ---
 
