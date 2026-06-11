@@ -295,13 +295,14 @@ router.get('/:id/redemptions', authMiddleware, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('redemptions')
-      .select('id, stamps_redeemed, points_redeemed, redeem_type, created_at')
+      .select('id, stamps_redeemed, points_redeemed, redeem_type, reward_label, redeemed_at')
       .eq('customer_id', req.params.id)
-      .order('created_at', { ascending: false })
+      .order('redeemed_at', { ascending: false })
       .limit(50)
 
     if (error) throw error
-    res.json({ redemptions: data || [] })
+    // expose redeemed_at as created_at for frontend compatibility
+    res.json({ redemptions: (data || []).map(r => ({ ...r, created_at: r.redeemed_at })) })
   } catch (err) {
     console.error('Get redemptions error:', err)
     res.status(500).json({ error: 'Failed to fetch redemptions' })

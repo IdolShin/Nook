@@ -18,7 +18,7 @@ function buildToken(biz) {
       page_permissions: biz.page_permissions || null,  // null = full access
     },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN }
+    { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
   )
 }
 
@@ -194,4 +194,4 @@ router.post('/scanner-token', require('../middleware/auth').authMiddleware, asyn
   res.json({ scanner_token: token })
 })
 
-module.exports = router
+module.exports 

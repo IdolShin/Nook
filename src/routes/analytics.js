@@ -65,7 +65,7 @@ router.get('/', async (req, res) => {
       const { count: rc } = await supabase.from('redemptions').select('id', { count: 'exact', head: true }).in('card_id', cardIds)
       redeemCount = rc || 0
 
-      const { count: r30 } = await supabase.from('redemptions').select('id', { count: 'exact', head: true }).in('card_id', cardIds).gte('created_at', thirtyDaysAgo)
+      const { count: r30 } = await supabase.from('redemptions').select('id', { count: 'exact', head: true }).in('card_id', cardIds).gte('redeemed_at', thirtyDaysAgo)
       redeemsLast30 = r30 || 0
     }
 
@@ -108,14 +108,14 @@ router.get('/', async (req, res) => {
 
       const { data: recentRedemptions } = await supabase
         .from('redemptions')
-        .select('created_at')
+        .select('redeemed_at')
         .in('card_id', cardIds)
-        .gte('created_at', thirtyDaysAgo)
+        .gte('redeemed_at', thirtyDaysAgo)
         .limit(5000)
 
       if (recentRedemptions) {
         recentRedemptions.forEach(r => {
-          const d = new Date(r.created_at)
+          const d = new Date(r.redeemed_at)
           const daysAgo = Math.floor((todayStart - d) / DAY_MS)
           const idx = 29 - daysAgo
           if (idx >= 0 && idx < 30) redemptionsDailyArr[idx]++
@@ -145,4 +145,4 @@ router.get('/', async (req, res) => {
   }
 })
 
-module.exports = router
+module.exports = rou

@@ -222,7 +222,7 @@ router.post('/staff-login', async (req, res) => {
         page_permissions: user.page_permissions,
       },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
+      { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
     )
 
     res.json({ token, business: biz, staff: { id: user.id, name: user.name, role: user.role } })
@@ -232,4 +232,4 @@ router.post('/staff-login', async (req, res) => {
   }
 })
 
-module.exports = router
+module.exports 
