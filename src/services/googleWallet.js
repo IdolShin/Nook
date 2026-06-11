@@ -231,30 +231,33 @@ async function updateMembershipPoints(customerId, totalPoints) {
 }
 
 // --- updateWithMessage ---
-// Patches a loyalty object with a message - triggers lock screen notification
+// Adds a message via addmessage + TEXT_AND_NOTIFY - triggers a real push notification
+// (previous version used update() + messageType TEXT, which is silent: message only
+//  appears on the back of the pass, no notification. Google limit: 3 notify/24h per pass)
 async function updateWithMessage(customerId, messageHeader, messageBody) {
   const auth = getAuth()
   const client = google.walletobjects({ version: 'v1', auth })
   const resId = objectId(customerId)
 
-  let existing
   try {
-    const { data } = await client.loyaltyobject.get({ resourceId: resId })
-    existing = data
+    await client.loyaltyobject.addmessage({
+      resourceId: resId,
+      requestBody: {
+        message: {
+          header: messageHeader,
+          body: messageBody,
+          id: `msg_${Date.now()}`,
+          messageType: 'TEXT_AND_NOTIFY'
+        }
+      }
+    })
+    return { updated: true }
   } catch (err) {
     if (err.code === 404) return { skipped: true, reason: 'no_wallet_pass' }
-    throw err
+    // Google returns 400/429 when the 3-notifications-per-24h quota is hit
+    console.error('[Wallet] addmessage failed for', resId, err.message)
+    return { updated: false, error: err.message }
   }
-
-  existing.messages = [{
-    header: messageHeader,
-    body: messageBody,
-    id: `msg_${Date.now()}`,
-    messageType: 'TEXT'
-  }]
-
-  await client.loyaltyobject.update({ resourceId: resId, requestBody: existing })
-  return { updated: true }
 }
 
 // --- Coupon pass helpers ---
