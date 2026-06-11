@@ -4,6 +4,11 @@ const { v4: uuidv4 } = require('uuid')
 const QRCode = require('qrcode')
 const supabase = require('../db/supabase')
 const { authMiddleware } = require('../middleware/auth')
+const {
+  createLoyaltyClass,
+  createLoyaltyObject,
+  generateWalletLink
+} = require('../services/googleWallet')
 
 // ─── POST /api/customers/register ────────────────────────────
 // 고객 카드 등록 (고객이 직접 등록하는 public endpoint)
@@ -32,7 +37,7 @@ router.post('/register', async (req, res) => {
     // Check card exists and is active
     const { data: card, error: cardErr } = await supabase
       .from('loyalty_cards')
-      .select('id, business_id, name, is_active')
+      .select('id, business_id, name, is_active, card_type, goal_stamps, reward_desc, color, google_class_id')
       .eq('id', card_id)
       .single()
 
@@ -42,7 +47,7 @@ router.post('/register', async (req, res) => {
     // ─── Plan enforcement: customer count limit ───────────────
     const { data: biz } = await supabase
       .from('businesses')
-      .select('plan, is_superadmin, name')
+      .select('id, plan, is_superadmin, name, logo_url')
       .eq('id', card.business_id)
       .single()
 
@@ -119,6 +124,30 @@ router.post('/register', async (req, res) => {
       color: { dark: '#000000', light: '#ffffff' }
     })
 
+    // ─── Create Google Wallet pass + "Add to Google Wallet" link ───
+    // Non-fatal: registration succeeds even if wallet creation fails
+    let wallet_link = null
+    try {
+      await createLoyaltyClass(card, biz || { name: 'Nook', logo_url: null })
+
+      if (!card.google_class_id) {
+        await supabase
+          .from('loyalty_cards')
+          .update({ google_class_id: `${process.env.GOOGLE_WALLET_ISSUER_ID}.card_${card.id.replace(/-/g, '_')}` })
+          .eq('id', card.id)
+      }
+
+      await createLoyaltyObject(customer, card, 0)
+      wallet_link = generateWalletLink(customer.id)
+
+      await supabase
+        .from('customers')
+        .update({ wallet_type: 'google' })
+        .eq('id', customer.id)
+    } catch (walletErr) {
+      console.error('Google Wallet pass creation failed (register):', walletErr.message || walletErr)
+    }
+
     res.status(201).json({
       customer: {
         id:            customer.id,
@@ -130,6 +159,7 @@ router.post('/register', async (req, res) => {
         card_id:       customer.card_id
       },
       qr_image: qrImageBase64,
+      wallet_link,
       message: 'Registration successful!'
     })
   } catch (err) {
