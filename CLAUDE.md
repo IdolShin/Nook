@@ -283,7 +283,7 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 | 인증/세션 | ✅ JWT 만료 없음(로그아웃 전까지 유지), 401 시 자동 /auth 리다이렉트, 쿠키 1년 |
 | 대시보드/고객/애널리틱스 | ✅ 실데이터 정상 표시 (redemptions `redeemed_at` 버그 수정) |
 | 쿠폰 시스템 | ✅ 생성/발급/공개 패스 페이지/바코드 리딤 라이브 검증 |
-| 푸시 알림 | ✅ ET 8am-8pm 발송, 시간 외 자동 예약 검증 |
+| 푸시 알림 | ✅ Wallet 잠금화면 실알림 (addmessage+TEXT_AND_NOTIFY, 3회/24h 제한) · ET 8am-8pm, 시간 외 예약은 메모리 기반(재시작 시 유실) |
 | 스캐너 카메라 | ✅ ZXing (iOS Safari 호환) |
 | Resend / Railway 배포 | ✅ 정상 |
 | Nook Cafe 테스트 데이터 | ✅ 고객 64명, 스탬프 245개, 리딤 3건, 쿠폰 5장 (30일 분산) |
@@ -294,6 +294,7 @@ POST /api/permissions/staff-login       { email, password }  →  { token }  (st
 
 ### 🔴 다음 작업 (단기)
 - [ ] **대시보드 "Scheduled pushes" 실데이터 연동** — 현재 mock(data.ts) 고정 표시. 실제 예약 푸시 목록 API + UI 연결 필요
+- [ ] **예약 푸시 DB 영속화** — 시간 외 예약 푸시가 서버 메모리에만 저장돼 Railway 재시작 시 유실 (Session 38에서 확인)
 - [ ] **Auto Campaigns 실전 검증** — 생일/윈백/스탬프완성 자동 쿠폰 스케줄러(매일 9am)는 구현돼 있으나 실제 발송 한 번도 미확인
 
 ### 🟡 중간 우선순위
@@ -370,6 +371,34 @@ git push origin main
 ---
 
 ## Change Log
+
+### 2026-06-11 (Session 38 — 세션 만료 제거 + 리딤 월렛 즉시 동기화 + 푸시 알림 실작동 수정)
+
+**백엔드 (IdolShin/Nook) — 3개 커밋:**
+
+- **`9a2783a`** — 세션 만료 완전 제거 + 리딤 시 월렛 동기화
+  - JWT에서 `exp` 제거 (사장님/직원/스캐너 토큰 전부) → 로그아웃 버튼 누르기 전까지 재로그인 불필요. 토큰 무효 시 자동 /auth 리다이렉트 안전장치는 유지
+  - 스탬프 리딤: 직원이 리딤 버튼 누르는 즉시 고객 월렛 패스가 **0/N으로 리셋** (이전엔 다음 스탬프까지 10/10 유지)
+  - 멤버십 리딤: 포인트 차감 시 월렛에 **남은 잔액** 표시 (이전엔 누적치만)
+  - COMPLETED 상태 전환은 의도적으로 미사용 — 구글 월렛이 패스를 회색 처리해 '만료된 패스'로 보내므로 반복 적립 구조와 맞지 않음. 즉시 리셋 + 푸시가 올바른 동작
+
+- **`8937418`** + **`875eb9e`** — 푸시 알림이 실제로는 안 가던 버그 수정 (`src/services/googleWallet.js`)
+  - 원인 1 (Web push): 가입 플로우에 web push 구독 절차가 없어 고객 전원 `device_token` null → 발송 대상 0명, `push_logs` 비어 있음
+  - 원인 2 (Google Wallet): `updateWithMessage()`가 `messageType: 'TEXT'`로 object update만 수행 → **무음** (패스 뒷면 메시지만 추가, 폰 알림 없음)
+  - 수정: `addmessage` API + `TEXT_AND_NOTIFY`로 교체 → 실제 잠금화면 알림 작동
+  - ⚠️ 구글 제한: **패스당 24시간에 알림 3회** — 테스트 반복 시 그날은 발송 안 됨. 수신 폰에서 Google Wallet 앱 알림 허용 필요
+
+**프론트엔드 (IdolShin/nook-admin) — 1개 커밋:**
+
+- **`ba9737e`** — 세션 쿠키 30일 → 1년 (JWT 만료 없음과 일치)
+
+**알려진 이슈 (미해결):**
+- ET 8am-8pm 외 발송 시 예약(`node-schedule`)이 **서버 메모리에만 존재** → Railway 재시작 시 예약 유실. DB 기반 예약으로 개선 필요
+- Web push는 device_token 전무로 사실상 미작동 — 가입 시 구독 요청 플로우 추가 필요 (또는 Wallet 알림 단일 채널로 정리)
+
+**Verified:** 라이브 검증 — "도윤" 고객 스탬프 10개 적립 후 리딤 → 패스 0/10 리셋 확인, Wallet 잠금화면 알림 수신 확인, Railway 양쪽 자동 배포 ✅
+
+---
 
 ### 2026-06-10~11 (Session 37 — Google Wallet 가입 연동 + 대시보드 복구 + 전체 기능 점검 + 샘플 데이터)
 
