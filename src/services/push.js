@@ -19,6 +19,11 @@ function isWithinEtHours() {
   return h >= 8 && h < 20
 }
 
+// ⏰ Set to true to restrict pushes to ET 8am–8pm. Temporarily disabled
+//    for testing (2026-06-11) — pushes go out at any hour. Flip back to true
+//    to re-enable the business-hours window.
+const ENFORCE_ET_HOURS = false
+
 // Returns the next UTC Date when ET will be exactly 8:00 AM
 function getNextEt8amUTC() {
   const now = new Date()
@@ -186,7 +191,7 @@ router.post('/broadcast', authMiddleware, async (req, res) => {
       if (planForSchedule !== 'premium') effectiveIdsForSchedule = null
     }
 
-    if (!isWithinEtHours()) {
+    if (ENFORCE_ET_HOURS && !isWithinEtHours()) {
       const nextTime = getNextEt8amUTC()
       const bizId   = req.business.id
       const bizName = req.business.name
