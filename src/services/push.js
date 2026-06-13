@@ -75,12 +75,21 @@ const pushService = {
         return { skipped: true, reason: 'invalid device_token format' }
       }
 
+      // Where the notification should take the customer when tapped:
+      // their own Google Wallet loyalty pass (not the Nook homepage).
+      let landingUrl = 'https://nook-wallet.com/'
+      try {
+        const { generateWalletLink } = require('./googleWallet')
+        landingUrl = generateWalletLink(customer.id)
+      } catch (_) { /* fall back to homepage */ }
+
       const payload = JSON.stringify({
         title:   businessName || 'Nook',
         body:    message,
         icon:    '/icons/icon-192.png',
         badge:   '/icons/badge-72.png',
         tag:     'nook-stamp',
+        url:     landingUrl,
         renotify: true
       })
 
