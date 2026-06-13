@@ -262,4 +262,35 @@ router.post('/broadcast', authMiddleware, async (req, res) => {
   }
 })
 
+// ─── GET /api/push/vapid ─────────────────────────────────────
+// Public: the customer's browser needs the VAPID public key to subscribe
+router.get('/vapid', (req, res) => {
+  res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || '' })
+})
+
+// ─── POST /api/push/subscribe ────────────────────────────────
+// Public: a customer's browser registers its Web Push subscription.
+// Stored as a JSON string in customers.device_token so broadcasts can
+// deliver a real OS notification with the title + body shown directly
+// (unlike Google Wallet messages, which only show "New message").
+router.post('/subscribe', async (req, res) => {
+  try {
+    const { customer_id, subscription } = req.body
+    if (!customer_id || !subscription || !subscription.endpoint) {
+      return res.status(400).json({ error: 'customer_id and subscription required' })
+    }
+
+    const { error } = await supabase
+      .from('customers')
+      .update({ device_token: JSON.stringify(subscription), consent_push: true })
+      .eq('id', customer_id)
+
+    if (error) throw error
+    res.json({ subscribed: true })
+  } catch (err) {
+    console.error('Push subscribe error:', err)
+    res.status(500).json({ error: 'Subscribe failed' })
+  }
+})
+
 module.exports = { router, pushService }
