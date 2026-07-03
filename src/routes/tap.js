@@ -308,7 +308,7 @@ router.post('/wallet', async (req, res) => {
       .select(`
         id, name, user_id, unique_key, business_id, card_id, created_at,
         loyalty_cards ( name, card_type, goal_stamps, reward_desc, reward_tiers, color ),
-        businesses ( id, name, logo_url )
+        businesses ( id, name, logo_url, lat, lng )
       `)
       .in('unique_key', cleaned)
 
@@ -345,7 +345,7 @@ router.post('/wallet', async (req, res) => {
       cards.push({
         unique_key:      c.unique_key,
         user_id:         c.user_id || c.name,
-        business:        c.businesses ? { id: c.businesses.id, name: c.businesses.name, logo_url: c.businesses.logo_url } : null,
+        business:        c.businesses ? { id: c.businesses.id, name: c.businesses.name, logo_url: c.businesses.logo_url, lat: c.businesses.lat ?? null, lng: c.businesses.lng ?? null } : null,
         card_name:       c.loyalty_cards?.name || 'Loyalty Card',
         card_type:       cardType,
         color:           c.loyalty_cards?.color || '#1D9E75',
