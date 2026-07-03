@@ -17,6 +17,8 @@ const analyticsRoutes   = require('./routes/analytics')
 const reviewRoutes      = require('./routes/reviews')
 const contactRoutes     = require('./routes/contact')
 const businessRoutes    = require('./routes/businesses')
+const tapRoutes         = require('./routes/tap')
+const tagRoutes         = require('./routes/tags')
 const schedule          = require('node-schedule')
 
 const app = express()
@@ -54,6 +56,8 @@ app.use('/api/permissions', permissionsRoutes)
 app.use('/api/reviews',     reviewRoutes)
 app.use('/api/contact',     contactRoutes)
 app.use('/api/businesses',  businessRoutes)
+app.use('/api/tap',         scanLimiter, tapRoutes)
+app.use('/api/tags',        tagRoutes)
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'nook-backend', time: new Date().toISOString() })
