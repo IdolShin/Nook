@@ -292,4 +292,92 @@ router.post('/collect', async (req, res) => {
   }
 })
 
+// ─── POST /api/tap/wallet ────────────────────────────────────
+// PUBLIC. Body: { keys: [unique_key, ...] }  (max 20)
+// Returns wallet card summaries for the customer app view.
+router.post('/wallet', async (req, res) => {
+  try {
+    const { keys } = req.body || {}
+    if (!Array.isArray(keys) || keys.length === 0) {
+      return res.status(400).json({ error: 'keys array required' })
+    }
+    const cleaned = [...new Set(keys.map(k => String(k).trim().toUpperCase()).filter(Boolean))].slice(0, 20)
+
+    const { data: customers } = await supabase
+      .from('customers')
+      .select(`
+        id, name, user_id, unique_key, business_id, card_id, created_at,
+        loyalty_cards ( name, card_type, goal_stamps, reward_desc, reward_tiers, color ),
+        businesses ( id, name, logo_url )
+      `)
+      .in('unique_key', cleaned)
+
+    const cards = []
+    for (const c of (customers || [])) {
+      const goal = c.loyalty_cards?.goal_stamps || 10
+      const cardType = c.loyalty_cards?.card_type || 'stamp'
+      const isMembership = cardType === 'membership'
+
+      const [{ count: totalStamps }, { count: stampRedeems }, { data: pointRedemptions }, { data: passes }] = await Promise.all([
+        supabase.from('stamps').select('id', { count: 'exact', head: true }).eq('customer_id', c.id),
+        supabase.from('redemptions').select('id', { count: 'exact', head: true }).eq('customer_id', c.id).eq('redeem_type', 'stamp'),
+        supabase.from('redemptions').select('points_redeemed').eq('customer_id', c.id).eq('redeem_type', 'points'),
+        supabase.from('coupon_passes')
+          .select('id, barcode, status, expires_at, coupons ( title, name, discount_type, discount_value, free_item_name )')
+          .eq('customer_id', c.id)
+          .eq('status', 'active')
+          .order('expires_at', { ascending: true })
+      ])
+
+      const total = totalStamps || 0
+      const spent = (pointRedemptions || []).reduce((s, r) => s + (r.points_redeemed || 0), 0)
+      const rewardsEarned = Math.floor(total / goal)
+
+      // last visit = latest stamp
+      const { data: lastStamp } = await supabase
+        .from('stamps')
+        .select('created_at')
+        .eq('customer_id', c.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      cards.push({
+        unique_key:      c.unique_key,
+        user_id:         c.user_id || c.name,
+        business:        c.businesses ? { id: c.businesses.id, name: c.businesses.name, logo_url: c.businesses.logo_url } : null,
+        card_name:       c.loyalty_cards?.name || 'Loyalty Card',
+        card_type:       cardType,
+        color:           c.loyalty_cards?.color || '#1D9E75',
+        goal_stamps:     isMembership ? null : goal,
+        current_stamps:  isMembership ? null : (total % goal),
+        total_stamps:    total,
+        total_points:    isMembership ? (total * 100 - spent) : null,
+        reward_desc:     c.loyalty_cards?.reward_desc || null,
+        reward_tiers:    isMembership ? (c.loyalty_cards?.reward_tiers || []) : null,
+        rewards_earned:  rewardsEarned,
+        rewards_redeemed: stampRedeems || 0,
+        reward_ready:    !isMembership && rewardsEarned > (stampRedeems || 0),
+        coupons:         (passes || []).map(p => ({
+          id: p.id, barcode: p.barcode, status: p.status, expires_at: p.expires_at,
+          title: p.coupons?.title || p.coupons?.name || 'Coupon',
+          discount_type: p.coupons?.discount_type || null,
+          discount_value: p.coupons?.discount_value || null,
+          free_item_name: p.coupons?.free_item_name || null
+        })),
+        last_visit:      lastStamp?.created_at || null,
+        joined_at:       c.created_at
+      })
+    }
+
+    // keep requested order
+    cards.sort((a, b) => cleaned.indexOf(a.unique_key) - cleaned.indexOf(b.unique_key))
+
+    res.json({ cards, not_found: cleaned.filter(k => !cards.some(c => c.unique_key === k)) })
+  } catch (err) {
+    console.error('Wallet lookup error:', err)
+    res.status(500).json({ error: 'Wallet lookup failed' })
+  }
+})
+
 module.exports = router
