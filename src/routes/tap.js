@@ -121,10 +121,10 @@ router.post('/collect', async (req, res) => {
     }
     if (claim.typ !== 'tap') return res.status(401).json({ error: 'Invalid tap token' })
 
-    // Load business (needed for prefix rule + push)
+    // Load business (needed for prefix rule + push + tap-moment marketing)
     const { data: business } = await supabase
       .from('businesses')
-      .select('id, name, logo_url')
+      .select('id, name, logo_url, tap_promo, google_review_url, review_reward_config')
       .eq('id', claim.business_id)
       .single()
     if (!business) return res.status(404).json({ error: 'Business not found' })
@@ -203,6 +203,42 @@ router.post('/collect', async (req, res) => {
       ctr:         claim.ctr,
       result:      'credited'
     }).then(() => {}, e => console.error('[Tap] event log failed:', e.message))
+
+    // ─── Tap Moment: welcome coupon on very first stamp ──────
+    let welcomeCoupon = null
+    if ((prevCount || 0) === 0) {
+      try {
+        const { data: welcomeCoupons } = await supabase
+          .from('coupons')
+          .select('id, title, valid_days, total_issued')
+          .eq('business_id', claim.business_id)
+          .eq('trigger_type', 'welcome')
+          .eq('is_active', true)
+          .limit(1)
+
+        const coupon = (welcomeCoupons || [])[0]
+        if (coupon) {
+          const barcode   = String(Math.floor(100000000000 + Math.random() * 900000000000))
+          const expiresAt = new Date(Date.now() + (coupon.valid_days || 14) * 86400000)
+          const { error: passErr } = await supabase.from('coupon_passes').insert({
+            coupon_id:   coupon.id,
+            customer_id: customer.id,
+            business_id: claim.business_id,
+            barcode,
+            status:      'active',
+            issued_at:   new Date().toISOString(),
+            expires_at:  expiresAt.toISOString()
+          })
+          if (!passErr) {
+            welcomeCoupon = { title: coupon.title, barcode, expires_at: expiresAt.toISOString() }
+            supabase.from('coupons')
+              .update({ total_issued: (coupon.total_issued || 0) + 1 })
+              .eq('id', coupon.id)
+              .then(() => {}, e => console.error('[Tap] welcome count failed:', e.message))
+          }
+        }
+      } catch (e) { console.error('[Tap] welcome coupon error:', e.message) }
+    }
 
     // Auto-issue stamp_complete coupons on reward (same as scan)
     let rewardReady = false
@@ -284,7 +320,20 @@ router.post('/collect', async (req, res) => {
       new_stamps:     isMembership ? null : (isReward ? goal : newCurrent),
       goal_stamps:    isMembership ? null : goal,
       rewards_earned: isMembership ? null : Math.floor(newTotal / goal),
-      reward_ready:   rewardReady
+      reward_ready:   rewardReady,
+
+      // ─── Tap Moment marketing payload ───────────────────────
+      welcome_coupon:  welcomeCoupon,
+      next_visit_free: !isMembership && !rewardReady && newCurrent === goal - 1,
+      tap_promo:       business.tap_promo || null,
+      review:          (business.google_review_url && business.review_reward_config && business.review_reward_config.enabled)
+        ? {
+            url: business.google_review_url,
+            reward_label: business.review_reward_config.reward_type === 'stamp'
+              ? `스탬프 +${business.review_reward_config.stamp_count || 1}`
+              : '쿠폰 선물'
+          }
+        : null
     })
   } catch (err) {
     console.error('Tap collect error:', err)

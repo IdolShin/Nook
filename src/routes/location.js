@@ -28,11 +28,11 @@ router.get('/', authMiddleware, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('businesses')
-      .select('address, lat, lng')
+      .select('address, lat, lng, tap_promo')
       .eq('id', req.business.id)
       .single()
     if (error) throw error
-    res.json({ address: data.address || '', lat: data.lat ?? null, lng: data.lng ?? null })
+    res.json({ address: data.address || '', lat: data.lat ?? null, lng: data.lng ?? null, tap_promo: data.tap_promo || '' })
   } catch (err) {
     console.error('Location get error:', err)
     res.status(500).json({ error: 'Failed to load location' })
@@ -67,22 +67,32 @@ router.post('/geocode', authMiddleware, async (req, res) => {
 })
 
 // ─── PATCH /api/location ─────────────────────────────────────
-// Body: { lat, lng, address? } → save store coordinates
+// Body: { lat?, lng?, address?, tap_promo? } — coords must come as a pair
 router.patch('/', authMiddleware, async (req, res) => {
   try {
-    const { lat, lng, address } = req.body || {}
-    const nLat = Number(lat), nLng = Number(lng)
-    if (!Number.isFinite(nLat) || !Number.isFinite(nLng) || Math.abs(nLat) > 90 || Math.abs(nLng) > 180) {
-      return res.status(400).json({ error: 'Valid lat and lng required' })
+    const { lat, lng, address, tap_promo } = req.body || {}
+    const updates = {}
+
+    if (lat !== undefined || lng !== undefined) {
+      const nLat = Number(lat), nLng = Number(lng)
+      if (!Number.isFinite(nLat) || !Number.isFinite(nLng) || Math.abs(nLat) > 90 || Math.abs(nLng) > 180) {
+        return res.status(400).json({ error: 'Valid lat and lng required (as a pair)' })
+      }
+      updates.lat = nLat
+      updates.lng = nLng
     }
-    const updates = { lat: nLat, lng: nLng }
     if (address !== undefined) updates.address = String(address).trim()
+    if (tap_promo !== undefined) updates.tap_promo = String(tap_promo).trim().slice(0, 120)
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'Nothing to update' })
+    }
 
     const { data, error } = await supabase
       .from('businesses')
       .update(updates)
       .eq('id', req.business.id)
-      .select('id, name, address, lat, lng')
+      .select('id, name, address, lat, lng, tap_promo')
       .single()
     if (error) throw error
     res.json({ business: data })
