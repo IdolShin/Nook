@@ -341,6 +341,77 @@ router.post('/collect', async (req, res) => {
   }
 })
 
+// ─── POST /api/tap/redeem-reward ─────────────────────────────
+// PUBLIC. Body: { unique_key }
+// Customer self-redeems an earned stamp reward at the counter.
+// "Banked" logic: any fully-earned, not-yet-redeemed reward can be
+// used regardless of the current cycle position. The customer shows
+// the live confirmation screen to staff (screenshot-proof clock).
+router.post('/redeem-reward', async (req, res) => {
+  try {
+    const { unique_key } = req.body || {}
+    if (!unique_key) return res.status(400).json({ error: 'unique_key required' })
+
+    const key = String(unique_key).trim().toUpperCase()
+    const { data: customer } = await supabase
+      .from('customers')
+      .select(`
+        id, name, user_id, unique_key, device_token, card_id, business_id,
+        loyalty_cards ( name, card_type, goal_stamps, reward_desc, color ),
+        businesses ( id, name )
+      `)
+      .eq('unique_key', key)
+      .maybeSingle()
+
+    if (!customer) return res.status(404).json({ error: 'Card not found', code: 'CUSTOMER_NOT_FOUND' })
+
+    const cardType = customer.loyalty_cards?.card_type || 'stamp'
+    if (cardType === 'membership') {
+      return res.status(400).json({ error: 'Membership points are redeemed by staff at the counter', code: 'MEMBERSHIP' })
+    }
+
+    const goal = customer.loyalty_cards?.goal_stamps || 10
+
+    const [{ count: totalStamps }, { count: redeemsCount }] = await Promise.all([
+      supabase.from('stamps').select('id', { count: 'exact', head: true }).eq('customer_id', customer.id),
+      supabase.from('redemptions').select('id', { count: 'exact', head: true }).eq('customer_id', customer.id).eq('redeem_type', 'stamp')
+    ])
+
+    const rewardsEarned = Math.floor((totalStamps || 0) / goal)
+    if (rewardsEarned <= (redeemsCount || 0)) {
+      return res.status(400).json({ error: 'No reward available yet', code: 'NO_REWARD' })
+    }
+
+    const redeemedAt = new Date().toISOString()
+    const { error: insErr } = await supabase.from('redemptions').insert({
+      customer_id:     customer.id,
+      card_id:         customer.card_id,
+      stamps_redeemed: goal,
+      redeem_type:     'stamp'
+    })
+    if (insErr) throw insErr
+
+    const rewardDesc = customer.loyalty_cards?.reward_desc || 'Reward'
+    pushService.sendToCustomer(
+      customer,
+      `Your "${rewardDesc}" reward has been redeemed. Enjoy!`,
+      customer.businesses?.name || 'Nook'
+    ).catch(e => console.error('[Tap] redeem push failed:', e.message))
+
+    res.json({
+      success:       true,
+      reward_desc:   rewardDesc,
+      business_name: customer.businesses?.name || '',
+      customer_name: customer.user_id || customer.name,
+      redeemed_at:   redeemedAt,
+      remaining_rewards: rewardsEarned - (redeemsCount || 0) - 1
+    })
+  } catch (err) {
+    console.error('Redeem reward error:', err)
+    res.status(500).json({ error: 'Redeem failed' })
+  }
+})
+
 // ─── POST /api/tap/wallet ────────────────────────────────────
 // PUBLIC. Body: { keys: [unique_key, ...] }  (max 20)
 // Returns wallet card summaries for the customer app view.
