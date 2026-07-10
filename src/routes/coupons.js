@@ -295,11 +295,35 @@ router.patch('/:id', async (req, res) => {
 // ─── DELETE /api/coupons/:id ──────────────────────────────────
 router.delete('/:id', async (req, res) => {
   try {
-    // Delete associated coupon_passes first
-    await supabase
+    // Ownership check first
+    const { data: coupon } = await supabase
+      .from('coupons')
+      .select('id')
+      .eq('id', req.params.id)
+      .eq('business_id', req.business.id)
+      .maybeSingle()
+    if (!coupon) return res.status(404).json({ error: 'Coupon not found' })
+
+    // FK chain: coupon_notifications -> coupon_passes -> coupons
+    const { data: passes } = await supabase
+      .from('coupon_passes')
+      .select('id')
+      .eq('coupon_id', req.params.id)
+
+    const passIds = (passes || []).map(p => p.id)
+    if (passIds.length > 0) {
+      const { error: notifErr } = await supabase
+        .from('coupon_notifications')
+        .delete()
+        .in('coupon_pass_id', passIds)
+      if (notifErr) throw notifErr
+    }
+
+    const { error: passErr } = await supabase
       .from('coupon_passes')
       .delete()
       .eq('coupon_id', req.params.id)
+    if (passErr) throw passErr
 
     const { error } = await supabase
       .from('coupons')
@@ -310,6 +334,7 @@ router.delete('/:id', async (req, res) => {
     if (error) throw error
     res.json({ success: true })
   } catch (err) {
+    console.error('Coupon delete error:', err)
     res.status(500).json({ error: 'Failed to delete coupon' })
   }
 })
