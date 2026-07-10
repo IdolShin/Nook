@@ -356,7 +356,7 @@ router.post('/redeem-reward', async (req, res) => {
     const { data: customer } = await supabase
       .from('customers')
       .select(`
-        id, name, user_id, unique_key, device_token, card_id, business_id,
+        id, name, user_id, unique_key, device_token, wallet_type, card_id, business_id,
         loyalty_cards ( name, card_type, goal_stamps, reward_desc, color ),
         businesses ( id, name )
       `)
@@ -392,6 +392,13 @@ router.post('/redeem-reward', async (req, res) => {
     if (insErr) throw insErr
 
     const rewardDesc = customer.loyalty_cards?.reward_desc || 'Reward'
+
+    // Keep the Google Wallet pass in sync after redemption
+    if (customer.wallet_type === 'google') {
+      updateStamps(customer.id, (totalStamps || 0) % goal).catch(err =>
+        console.error('[Google Wallet] post-redeem stamp sync failed:', err.message))
+    }
+
     pushService.sendToCustomer(
       customer,
       `Your "${rewardDesc}" reward has been redeemed. Enjoy!`,
