@@ -419,6 +419,83 @@ router.post('/redeem-reward', async (req, res) => {
   }
 })
 
+// ─── POST /api/tap/redeem-points ─────────────────────────────
+// PUBLIC. Body: { unique_key, points, reward_label? }
+// Membership self-redemption at the counter (mirrors stamp reward flow).
+router.post('/redeem-points', async (req, res) => {
+  try {
+    const { unique_key, points, reward_label } = req.body || {}
+    if (!unique_key || !points || Number(points) <= 0) {
+      return res.status(400).json({ error: 'unique_key and positive points required' })
+    }
+    const pts = Math.floor(Number(points))
+    const key = String(unique_key).trim().toUpperCase()
+
+    const { data: customer } = await supabase
+      .from('customers')
+      .select(`
+        id, name, user_id, unique_key, device_token, wallet_type, card_id,
+        loyalty_cards ( card_type, reward_desc ),
+        businesses ( id, name )
+      `)
+      .eq('unique_key', key)
+      .maybeSingle()
+
+    if (!customer) return res.status(404).json({ error: 'Card not found', code: 'CUSTOMER_NOT_FOUND' })
+    if ((customer.loyalty_cards?.card_type || 'stamp') !== 'membership') {
+      return res.status(400).json({ error: 'This card does not use points', code: 'NOT_MEMBERSHIP' })
+    }
+
+    const [{ count: totalStamps }, { data: prevRedemptions }] = await Promise.all([
+      supabase.from('stamps').select('id', { count: 'exact', head: true }).eq('customer_id', customer.id),
+      supabase.from('redemptions').select('points_redeemed').eq('customer_id', customer.id).eq('redeem_type', 'points')
+    ])
+
+    const earned  = (totalStamps || 0) * 100
+    const spent   = (prevRedemptions || []).reduce((s, r) => s + (r.points_redeemed || 0), 0)
+    const balance = earned - spent
+
+    if (pts > balance) {
+      return res.status(400).json({ error: `Not enough points. Balance: ${balance} pts.`, code: 'INSUFFICIENT', balance })
+    }
+
+    const { error: insErr } = await supabase.from('redemptions').insert({
+      customer_id:     customer.id,
+      card_id:         customer.card_id,
+      points_redeemed: pts,
+      redeem_type:     'points',
+      ...(reward_label ? { reward_label } : {})
+    })
+    if (insErr) throw insErr
+
+    const newBalance = balance - pts
+
+    if (customer.wallet_type === 'google') {
+      updateMembershipPoints(customer.id, newBalance).catch(err =>
+        console.error('[Google Wallet] post-points-redeem sync failed:', err.message))
+    }
+
+    pushService.sendToCustomer(
+      customer,
+      `${pts} points redeemed${reward_label ? ` for ${reward_label}` : ''}. Balance: ${newBalance} pts.`,
+      customer.businesses?.name || 'Nook'
+    ).catch(e => console.error('[Tap] points redeem push failed:', e.message))
+
+    res.json({
+      success:       true,
+      points_spent:  pts,
+      new_balance:   newBalance,
+      reward_label:  reward_label || null,
+      business_name: customer.businesses?.name || '',
+      customer_name: customer.user_id || customer.name,
+      redeemed_at:   new Date().toISOString()
+    })
+  } catch (err) {
+    console.error('Redeem points error:', err)
+    res.status(500).json({ error: 'Points redemption failed' })
+  }
+})
+
 // ─── POST /api/tap/wallet ────────────────────────────────────
 // PUBLIC. Body: { keys: [unique_key, ...] }  (max 20)
 // Returns wallet card summaries for the customer app view.

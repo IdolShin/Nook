@@ -123,7 +123,25 @@ router.get('/', async (req, res) => {
       }
     }
 
+    // ── NFC tap adoption (last 30 days) ──
+    const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    const [{ count: taps30 }, { count: activeTags }, { count: totalTags }] = await Promise.all([
+      supabase.from('tap_events').select('id', { count: 'exact', head: true })
+        .eq('business_id', bizId).eq('result', 'credited').gte('created_at', since30),
+      supabase.from('nfc_tags').select('id', { count: 'exact', head: true })
+        .eq('business_id', bizId).eq('is_active', true),
+      supabase.from('nfc_tags').select('id', { count: 'exact', head: true })
+        .eq('business_id', bizId)
+    ])
+    const nfcShare = stampsLast30 > 0
+      ? Math.min(100, Math.round(((taps30 || 0) / stampsLast30) * 100))
+      : 0
+
     res.json({
+      taps_30d:             taps30 || 0,
+      active_tags:          activeTags || 0,
+      total_tags:           totalTags || 0,
+      nfc_share_30d:        nfcShare,
       total_customers:      customerCount || 0,
       new_customers_30d:    newCustomers30 || 0,
       new_customers_prev:   newCustomersPrev || 0,

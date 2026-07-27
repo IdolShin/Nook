@@ -20,15 +20,26 @@ router.get('/', authMiddleware, async (req, res) => {
     const since = new Date(Date.now() - 30 * 86400000).toISOString()
     const { data: events } = await supabase
       .from('tap_events')
-      .select('tag_id')
+      .select('tag_id, created_at')
       .eq('business_id', req.business.id)
       .eq('result', 'credited')
       .gte('created_at', since)
+      .order('created_at', { ascending: false })
 
     const counts = {}
-    for (const e of (events || [])) counts[e.tag_id] = (counts[e.tag_id] || 0) + 1
+    const lastTap = {}
+    for (const e of (events || [])) {
+      counts[e.tag_id] = (counts[e.tag_id] || 0) + 1
+      if (!lastTap[e.tag_id]) lastTap[e.tag_id] = e.created_at   // events are DESC
+    }
 
-    res.json({ tags: (tags || []).map(t => ({ ...t, taps_30d: counts[t.id] || 0 })) })
+    res.json({
+      tags: (tags || []).map(t => ({
+        ...t,
+        taps_30d: counts[t.id] || 0,
+        last_tap_at: lastTap[t.id] || null
+      }))
+    })
   } catch (err) {
     console.error('Tags list error:', err)
     res.status(500).json({ error: 'Failed to list tags' })
