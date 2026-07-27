@@ -527,7 +527,7 @@ router.post('/wallet', async (req, res) => {
         supabase.from('redemptions').select('id', { count: 'exact', head: true }).eq('customer_id', c.id).eq('redeem_type', 'stamp'),
         supabase.from('redemptions').select('points_redeemed').eq('customer_id', c.id).eq('redeem_type', 'points'),
         supabase.from('coupon_passes')
-          .select('id, barcode, status, expires_at, coupons ( title, name, discount_type, discount_value, free_item_name )')
+          .select('id, barcode, status, expires_at, coupons ( title, coupon_type, discount_value, free_item_name, color )')
           .eq('customer_id', c.id)
           .eq('status', 'active')
           .order('expires_at', { ascending: true })
@@ -562,13 +562,18 @@ router.post('/wallet', async (req, res) => {
         rewards_earned:  rewardsEarned,
         rewards_redeemed: stampRedeems || 0,
         reward_ready:    !isMembership && rewardsEarned > (stampRedeems || 0),
-        coupons:         (passes || []).map(p => ({
-          id: p.id, barcode: p.barcode, status: p.status, expires_at: p.expires_at,
-          title: p.coupons?.title || p.coupons?.name || 'Coupon',
-          discount_type: p.coupons?.discount_type || null,
-          discount_value: p.coupons?.discount_value || null,
-          free_item_name: p.coupons?.free_item_name || null
-        })),
+        coupons:         (passes || []).map(p => {
+          const type = p.coupons?.coupon_type || null
+          return {
+            id: p.id, barcode: p.barcode, status: p.status, expires_at: p.expires_at,
+            title: p.coupons?.title || 'Coupon',
+            // UI expects percent/fixed for discount labels; other types fall back to title
+            discount_type: (type === 'percent' || type === 'fixed') ? type : null,
+            discount_value: p.coupons?.discount_value ?? null,
+            free_item_name: p.coupons?.free_item_name || null,
+            color: p.coupons?.color || null
+          }
+        }),
         last_visit:      lastStamp?.created_at || null,
         joined_at:       c.created_at
       })
