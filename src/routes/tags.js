@@ -11,7 +11,7 @@ router.get('/', authMiddleware, async (req, res) => {
   try {
     const { data: tags, error } = await supabase
       .from('nfc_tags')
-      .select('id, name, uid, last_ctr, is_active, created_at')
+      .select('id, name, uid, last_ctr, is_active, created_at, tag_mode, cooldown_sec')
       .eq('business_id', req.business.id)
       .order('created_at', { ascending: false })
     if (error) throw error
@@ -50,7 +50,7 @@ router.get('/', authMiddleware, async (req, res) => {
 // Body: { name, uid, meta_key?, file_key? }  (keys default to factory zeros)
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { name, uid, meta_key, file_key } = req.body || {}
+    const { name, uid, meta_key, file_key, tag_mode } = req.body || {}
     if (!uid || !UID_RE.test(String(uid).trim())) {
       return res.status(400).json({ error: 'uid must be 14 hex characters (7-byte tag UID, e.g. 04AABBCCDDEE80)' })
     }
@@ -62,13 +62,14 @@ router.post('/', authMiddleware, async (req, res) => {
       name:        (name || '').trim() || 'NFC Stamp',
       uid:         String(uid).trim().toUpperCase(),
       ...(meta_key ? { meta_key: meta_key.toUpperCase() } : {}),
-      ...(file_key ? { file_key: file_key.toUpperCase() } : {})
+      ...(file_key ? { file_key: file_key.toUpperCase() } : {}),
+      tag_mode: tag_mode === 'basic' ? 'basic' : 'sdm'
     }
 
     const { data: tag, error } = await supabase
       .from('nfc_tags')
       .insert(row)
-      .select('id, name, uid, last_ctr, is_active, created_at')
+      .select('id, name, uid, last_ctr, is_active, created_at, tag_mode, cooldown_sec')
       .single()
 
     if (error) {
@@ -99,7 +100,7 @@ router.patch('/:id', authMiddleware, async (req, res) => {
       .update(updates)
       .eq('id', req.params.id)
       .eq('business_id', req.business.id)
-      .select('id, name, uid, last_ctr, is_active, created_at')
+      .select('id, name, uid, last_ctr, is_active, created_at, tag_mode, cooldown_sec')
       .single()
 
     if (error || !tag) return res.status(404).json({ error: 'Tag not found' })

@@ -18,11 +18,55 @@ const TAP_TOKEN_TTL = '10m'
 router.post('/verify', async (req, res) => {
   try {
     const { picc_data, cmac, uid: plainUid, ctr: plainCtr } = req.body || {}
-    if (!cmac) return res.status(400).json({ error: 'cmac required' })
 
     let tag = null
     let uid = null
     let ctr = null
+
+    // ── BASIC mode: plain tag (NTAG213/215/216) — UID only, no signature ──
+    if (!cmac && plainUid) {
+      const basicUid = String(plainUid).trim().toUpperCase().replace(/[^0-9A-F]/g, '')
+      const { data: bTag } = await supabase
+        .from('nfc_tags')
+        .select('id, business_id, name, uid, tag_mode, cooldown_sec, is_active')
+        .eq('uid', basicUid)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (!bTag) {
+        return res.status(404).json({ error: 'Tag not recognized. Ask the store to register this stamp.', code: 'TAG_UNKNOWN' })
+      }
+      if (bTag.tag_mode !== 'basic') {
+        return res.status(401).json({ error: 'This stamp requires a secure tap signature.', code: 'SIGNATURE_REQUIRED' })
+      }
+
+      const [{ data: business }, { data: cards }] = await Promise.all([
+        supabase.from('businesses').select('id, name, logo_url').eq('id', bTag.business_id).single(),
+        supabase.from('loyalty_cards')
+          .select('id, name, card_type, goal_stamps, reward_desc, color')
+          .eq('business_id', bTag.business_id)
+          .eq('is_active', true)
+          .order('created_at', { ascending: true })
+      ])
+      if (!business) return res.status(404).json({ error: 'Business not found' })
+
+      const tap_token = jwt.sign(
+        { typ: 'tap', mode: 'basic', tag_id: bTag.id, business_id: bTag.business_id, uid: basicUid },
+        JWT_SECRET,
+        { expiresIn: TAP_TOKEN_TTL }
+      )
+
+      return res.json({
+        valid: true,
+        mode: 'basic',
+        tap_token,
+        tag_name: bTag.name || null,
+        business,
+        cards: cards || []
+      })
+    }
+
+    if (!cmac) return res.status(400).json({ error: 'cmac required' })
 
     if (picc_data) {
       // Encrypted mode: try each distinct meta_key among active tags
@@ -156,17 +200,47 @@ router.post('/collect', async (req, res) => {
       return res.status(404).json({ error: 'Customer not found for this store', code: 'CUSTOMER_NOT_FOUND' })
     }
 
-    // ─── Atomically consume the counter (replay protection) ──
-    const { data: consumed } = await supabase
-      .from('nfc_tags')
-      .update({ last_ctr: claim.ctr })
-      .eq('id', claim.tag_id)
-      .eq('is_active', true)
-      .lt('last_ctr', claim.ctr)
-      .select('id')
+    if (claim.mode === 'basic') {
+      // ── BASIC tags have no counter: use a per-customer cooldown instead ──
+      const { data: tagRow } = await supabase
+        .from('nfc_tags')
+        .select('id, cooldown_sec, is_active')
+        .eq('id', claim.tag_id)
+        .maybeSingle()
 
-    if (!consumed || consumed.length === 0) {
-      return res.status(409).json({ error: 'This tap was already used. Please tap the stamp again.', code: 'REPLAY' })
+      if (!tagRow || !tagRow.is_active) {
+        return res.status(404).json({ error: 'This stamp is no longer active.', code: 'TAG_INACTIVE' })
+      }
+
+      const cooldown = tagRow.cooldown_sec ?? 180
+      const since = new Date(Date.now() - cooldown * 1000).toISOString()
+      const { count: recent } = await supabase
+        .from('tap_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('tag_id', claim.tag_id)
+        .eq('customer_id', customer.id)
+        .eq('result', 'credited')
+        .gte('created_at', since)
+
+      if ((recent || 0) > 0) {
+        return res.status(409).json({
+          error: `Already collected just now. Please wait ${Math.ceil(cooldown / 60)} minute(s) before tapping again.`,
+          code: 'COOLDOWN'
+        })
+      }
+    } else {
+      // ─── SDM: atomically consume the counter (replay protection) ──
+      const { data: consumed } = await supabase
+        .from('nfc_tags')
+        .update({ last_ctr: claim.ctr })
+        .eq('id', claim.tag_id)
+        .eq('is_active', true)
+        .lt('last_ctr', claim.ctr)
+        .select('id')
+
+      if (!consumed || consumed.length === 0) {
+        return res.status(409).json({ error: 'This tap was already used. Please tap the stamp again.', code: 'REPLAY' })
+      }
     }
 
     // ─── Credit stamp (mirrors /api/scan) ─────────────────────
